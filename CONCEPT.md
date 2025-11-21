@@ -62,3 +62,8 @@ analysis of our product roadmap and opportunities for building the future of int
 autonomous systems.
 LUKE HOLLIS | lhollis@g.harvard.edu | +1 617.372.4811
 CONFIDENTIAL // DO NOT DISTRIBUTE WITHOUT PRIOR CONSENT
+
+UPDATE 
+
+- frontend with LLM guided experiment design is /Users/lrh/Projects/causality/causality
+- world model jepa-dml is /Users/lrh/Projects/causality/jepa_dml
