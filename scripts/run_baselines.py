@@ -89,24 +89,24 @@ def main():
     # 1. Oracle Baseline
     start_time = time.time()
     ate_oracle, err_oracle = evaluate_oracle_cv(dataset, config, device)
-    evaluator.log_result('Oracle', ate_oracle, calculate_ate_error(ate_oracle), training_time=time.time()-start_time)
+    evaluator.log_result('Oracle', ate_oracle, calculate_ate_error(ate_oracle), std_err=err_oracle, training_time=time.time()-start_time)
     
     # 2. DragonNet Baseline
     start_time = time.time()
     ate_dragon, err_dragon = evaluate_dragonnet_cv(dataset, config, device)
-    evaluator.log_result('DragonNet', ate_dragon, calculate_ate_error(ate_dragon), training_time=time.time()-start_time)
+    evaluator.log_result('DragonNet', ate_dragon, calculate_ate_error(ate_dragon), std_err=err_dragon, training_time=time.time()-start_time)
     
     # 3. VICReg-DML
     start_time = time.time()
     print("\n--- Running VICReg-DML ---")
     ate_vicreg, err_vicreg = execute_dml_workflow(dataset, config, device, train_encoder_func=train_vicreg)
-    evaluator.log_result('VICReg-DML', ate_vicreg, calculate_ate_error(ate_vicreg), training_time=time.time()-start_time)
+    evaluator.log_result('VICReg-DML', ate_vicreg, calculate_ate_error(ate_vicreg), std_err=err_vicreg, training_time=time.time()-start_time)
     
     # 4. JEPA-DML (Our Method)
     start_time = time.time()
     print("\n--- Running JEPA-DML (Proposed) ---")
     ate_jepa, err_jepa = execute_dml_workflow(dataset, config, device, train_encoder_func=train_jepa)
-    evaluator.log_result('JEPA-DML', ate_jepa, calculate_ate_error(ate_jepa), training_time=time.time()-start_time)
+    evaluator.log_result('JEPA-DML', ate_jepa, calculate_ate_error(ate_jepa), std_err=err_jepa, training_time=time.time()-start_time)
     
     # Save Results
     evaluator.save_results()

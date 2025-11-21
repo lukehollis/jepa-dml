@@ -27,16 +27,17 @@ class BaselineEvaluator:
         self.results_dir = results_dir
         self.results = []
 
-    def log_result(self, model_name, ate_est, ate_error, pehe=None, training_time=None):
+    def log_result(self, model_name, ate_est, ate_error, std_err=None, pehe=None, training_time=None):
         result = {
             'model': model_name,
             'ate_est': ate_est,
             'ate_error': ate_error,
+            'std_err': std_err,
             'pehe': pehe,
             'training_time': training_time
         }
         self.results.append(result)
-        print(f"[{model_name}] ATE Est: {ate_est:.4f}, Error: {ate_error:.4f}")
+        print(f"[{model_name}] ATE Est: {ate_est:.4f} (±{std_err:.4f}), Error: {ate_error:.4f}")
 
     def save_results(self, filename='comparison_results.csv'):
         df = pd.DataFrame(self.results)
