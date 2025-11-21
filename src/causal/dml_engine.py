@@ -20,13 +20,12 @@ def generate_representations(encoder, data_loader, device):
     return torch.cat(R_list), torch.cat(T_list), torch.cat(Y_list)
 
 
-def execute_jepa_dml_workflow(dataset, config, device):
+def execute_dml_workflow(dataset, config, device, train_encoder_func=train_jepa):
     """
     Implements the full K-Fold Cross-Fitting DML procedure (ICCV Algorithm 1).
     """
     kf = KFold(n_splits=config['k_folds'], shuffle=True, random_state=42)
     scores = []
-    input_dims = dataset.data_dims
 
     # Iterate over folds
     for fold, (train_index, test_index) in enumerate(kf.split(range(len(dataset)))):
@@ -36,21 +35,21 @@ def execute_jepa_dml_workflow(dataset, config, device):
         train_subset = Subset(dataset, train_index)
         test_subset = Subset(dataset, test_index)
         
-        # Loaders for JEPA training (needs shuffle)
-        train_loader_jepa = DataLoader(train_subset, batch_size=config['batch_size'], shuffle=True)
+        # Loaders for Representation Learning (needs shuffle)
+        train_loader_repr_learn = DataLoader(train_subset, batch_size=config['batch_size'], shuffle=True)
         
         # Loaders for representation generation (no shuffle needed)
         train_loader_repr = DataLoader(train_subset, batch_size=config['batch_size'], shuffle=False)
         test_loader_repr = DataLoader(test_subset, batch_size=config['batch_size'], shuffle=False)
 
         # === Stage 1: Fold-Specific Representation Learning ===
-        # CRITICAL: Train JEPA from scratch only on the training data of this fold.
-        jepa_encoder = train_jepa(train_loader_jepa, input_dims, config, device)
+        # CRITICAL: Train Encoder from scratch only on the training data of this fold.
+        encoder = train_encoder_func(train_loader_repr_learn, config, device)
 
         # Generate representations R using the fold-specific encoder
         print("  Generating representations (R)...")
-        R_train, T_train, Y_train = generate_representations(jepa_encoder, train_loader_repr, device)
-        R_test, T_test, Y_test = generate_representations(jepa_encoder, test_loader_repr, device)
+        R_train, T_train, Y_train = generate_representations(encoder, train_loader_repr, device)
+        R_test, T_test, Y_test = generate_representations(encoder, test_loader_repr, device)
 
         # === Stage 2: Nuisance Model Training ===
         print("  Training Nuisance Models (f(R), µ, π)...")

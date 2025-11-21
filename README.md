@@ -34,10 +34,13 @@ pip install -r requirements.txt
 
 ## Quick Start
 
-Run the simulation to verify the installation:
+### Training (Demo)
+
+Run the demo simulation to verify installation:
 
 ```bash
-python main.py
+conda activate causal_engine
+python scripts/train.py
 ```
 
 This will:
@@ -48,32 +51,99 @@ This will:
 
 Expected output should show an estimated ATE close to the true value of 1.0.
 
+### Inference (Apply to New Data)
+
+Apply the framework to your own causal questions:
+
+```bash
+python scripts/inference.py \
+  --data path/to/your/data.h5 \
+  --treatment "policy_intervention" \
+  --outcome "economic_outcome" \
+  --checkpoint checkpoints/jepa_encoder.pt \
+  --output results/my_analysis.json
+```
+
+### Evaluation (Benchmarking)
+
+Run the full evaluation suite from the ICCV paper:
+
+```bash
+# Quick evaluation (100 runs)
+python scripts/eval.py --n_runs 100
+
+# Full paper benchmark (500 runs)
+python scripts/eval.py --n_runs 500 --eval_sufficiency --eval_overlap
+```
+
+This generates:
+- Bias, RMSE, and coverage statistics
+- Sufficiency validation (R² for U prediction)
+- Overlap diagnostics (propensity score distribution)
+- Distribution plots in `results/`
+
+### Baselines & Comparison
+
+Compare the JEPA-based approach against standard baselines:
+
+```bash
+python scripts/run_baselines.py
+```
+
+This evaluates:
+1.  **JEPA-DML** (Proposed Method)
+2.  **VICReg-DML** (Self-supervised baseline using Variance-Invariance-Covariance Regularization)
+3.  **DragonNet** (End-to-end causal inference neural network)
+4.  **Oracle** (Supervised baseline with access to latent confounders)
+
+Results including ATE estimates and errors are saved to `results/baselines/comparison_results.csv`.
+
 ## Project Structure
 
 ```
 causal_engine/
+├── scripts/
+│   ├── train.py                 # Training demo/simulation
+│   ├── inference.py             # Apply to new causal questions
+│   ├── eval.py                  # Benchmark suite
+│   └── run_baselines.py         # Baseline comparison runner
 ├── src/
+│   ├── baselines/               # Comparison methods (DragonNet, VICReg, Oracle)
 │   ├── data/
-│   │   └── dataset.py           # Spatiotemporal data simulation
+│   │   └── dataset.py           # Spatiotemporal data handling
 │   ├── models/
-│   │   ├── encoder.py           # Spatiotemporal encoder (3D CNN)
-│   │   └── jepa.py              # JEPA architecture and training
+│   │   ├── encoder.py           # Vision Transformer (ViT) encoder
+│   │   ├── jepa.py              # JEPA architecture and training
+│   │   └── masking.py           # Tube masking strategies
 │   └── causal/
-│       ├── nuisance_models.py   # Proxy, outcome, and propensity models
+│       ├── nuisance_models.py   # Proxy, outcome, propensity models
 │       └── dml_engine.py        # DML cross-fitting workflow
-├── main.py                      # Main execution script
-├── environment.yml              # Conda environment specification
+├── results/                     # Evaluation outputs
+├── checkpoints/                 # Saved model weights
+├── environment.yml              # Conda environment
 └── requirements.txt             # Pip requirements
 ```
 
 ## Configuration
 
-Edit the `CONFIG` dictionary in `main.py` to adjust:
+Edit the `CONFIG` dictionary in `scripts/train.py` to adjust:
+
+### Data Parameters
 - `n_samples`: Number of data samples
 - `data_dims`: Spatiotemporal dimensions (C, T, H, W)
-- `rep_dim`: JEPA representation dimension
 - `k_folds`: Number of cross-fitting folds
-- `jepa_epochs`: JEPA training epochs per fold
+
+### JEPA Parameters
+- `vit_size`: ViT variant ('small', 'base', 'large')
+- `patch_size`: Spatial patch size (8 or 16)
+- `tubelet_size`: Temporal grouping size (2)
+- `rep_dim`: JEPA representation dimension
+- `jepa_epochs`: Training epochs per fold (20-100)
+- `mask_ratio`: Fraction of patches to mask (0.75)
+- `num_mask_blocks`: Number of tube mask regions (4)
+
+### DML Parameters
+- `proxy_dim`: Confounder proxy dimension
 - `dml_epochs`: Nuisance model training epochs
 
 ## Key Features

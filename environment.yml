@@ -1,7 +1,6 @@
 name: causal_engine
 channels:
   - pytorch
-  - nvidia
   - conda-forge
   - defaults
 dependencies:
@@ -9,16 +8,13 @@ dependencies:
   - pytorch::pytorch>=2.0.0
   - pytorch::torchvision
   - pytorch::torchaudio
-  - pytorch::pytorch-cuda=12.1
   - pip
   - numpy
   - scipy
   - scikit-learn
-  - einops
-  - timm
   - pip:
-    - decord
-    - av
+    - einops
+    - timm
     - pandas
     - matplotlib
     - seaborn
