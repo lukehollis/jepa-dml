@@ -1,0 +1,1802 @@
+GenAI-Powered Inference∗
+Kosuke Imai† Kentaro Nakamura‡
+September 9, 2025
+Abstract
+We introduce GenAI-Powered Inference (GPI), a statistical framework for both causal and
+predictive inference using unstructured data, including text and images. GPI leverages opensource Generative Artificial Intelligence (GenAI) models—such as large language models and
+diffusion models—not only to generate unstructured data at scale but also to extract lowdimensional representations that are guaranteed to capture their underlying structure. Applying machine learning to these representations, GPI enables estimation of causal and predictive effects while quantifying associated estimation uncertainty. Unlike existing approaches
+to representation learning, GPI does not require fine-tuning of generative models, making it
+computationally efficient and broadly accessible. We illustrate the versatility of the GPI framework through three applications: (1) analyzing Chinese social media censorship, (2) estimating
+predictive effects of candidates’ facial appearance on electoral outcomes, and (3) assessing the
+persuasiveness of political rhetoric. An open-source software package is available for implementing GPI.
+Key Words: deep generative models, double machine learning, generative artificial intelligence,
+large language models, representation learning, unstructured data
+∗An open-source Python package, GPI: GenAI-Powered Inference, that implements the proposed methodology
+is available at https://gpi-pack.github.io/. We thank Naoki Egami for helpful comments.
+†Professor, Department of Government and Department of Statistics, Harvard University, Cambridge, MA 02138.
+Phone: 617–384–6778, Email: Imai@Harvard.Edu, URL: https://imai.fas.harvard.edu
+‡Ph.D. student, John F. Kennedy School of Government, Harvard University. Email: knakamura@g.harvard.edu
+arXiv:2507.03897v2 [cs.LG] 7 Sep 2025
+1 Introduction
+The emergence of Generative Artificial Intelligence (GenAI), including large language models and
+diffusion models, has transformed many aspects of society. In this paper, we show that GenAI
+can also serve as a powerful tool for causal and predictive inference. We introduce a new statistical framework, GenAI-Powered Inference (GPI), which leverages open-source GenAI models to
+enhance statistical analysis with high-dimensional unstructured data such as text and images.
+We illustrate the power of GPI through the following three applications:
+1. Text as confounder: Estimating causal effects of a treatment by adjusting for latent confounders embedded in textual data
+2. Predictive effects of image features: Assessing the predictive impact of specific image
+features while adjusting for other relevant characteristics in the same image.
+3. Structural model of texts: Estimating structural models that incorporate both observed
+and latent textual features as covariates.
+A common challenge in these settings is that while high-dimensional unstructured data are observed, we do not know, a priori, which features serve as relevant confounders.
+GPI addresses this challenge by leveraging the ability of GenAI to generate or replicate unstructured data and to extract low-dimensional vector representations that are guaranteed to contain all the relevant information. Machine learning is then applied to these representations to
+identify a deconfounder, which is a summary of confounding information. Because these representations were used in the actual generative process, GPI eliminates the need to explicitly
+model the data-generating process or fine-tune the underlying GenAI models. This makes GPI
+a broadly accessible framework. Our open-source Python package GPI, which is available at
+https://gpi-pack.github.io/, implements the proposed methodology, further enhancing its applicability.
+1.1 The Proposed Methodological Framework
+Before moving on to each application, we provide a brief overview of the proposed methodology.
+Figure 1 considers two illustrative settings, in which the goal is to estimate the causal effect
+of treatment T on an outcome Y . The treatment may represent some features of unstructured
+data X as in the “text/image as treatment” case (bottom right) or other variables as in the
+“text/image as confounder” case (top right). In both settings, the treatment-outcome relationship
+is confounded by the latent features U of the unstructured data X as well as other observed
+(structured) confounders Z. A key challenge is to identify these latent confounding features U and
+adjust for them to estimate causal effects.
+To achieve its goal, GPI leverages GenAI models to produce unstructured data X and extract corresponding internal representations R. For existing texts or images, GenAI models are
+prompted to regenerate the identical content, enabling the derivation of consistent internal representations. Because we configure the GenAI to generate X as a deterministic function of R, the
+latter is guaranteed to contain all the relevant information used to produce the former. Therefore, GPI eliminates the need to finetune R, unlike the standard approach that relies upon existing
+generic embeddings such as BERT (Bidirectional Encoder Representations from Transformers) and
+openAI’s embedding models.
+Using R rather than directly modeling the raw data X offers several key advantages. First, R
+is a significantly lower-dimensional embedding of the original high-dimensional input. Second, it
+encodes rich, relevant information distilled from the extensive data used during the GenAI model’s
+2
+Generative-AI
+or
+Inputs
+Prompts
+Unstructured Objects of Interest
+Machine Learning
+Pre-training Data
+Text/Image-as-Treatment
+Texts
+Images
+U
+Confounding
+Feature
+T
+Treatment
+Feature
+Y
+Outcome
+f(R)
+Deconfounder
+Internal
+Representation
+R
+Text/Image-as-Confounder
+Texts
+Images
+U
+Confounding
+Feature
+T
+Treatment
+Y
+Outcome
+Z Confounders
+Z Confounders
+Figure 1: Illustration of GenAI-Powered Inference. Inputs to generative AI are either prompts or
+unstructured data (e.g., text or images). Pre-trained models produce internal representations R,
+which we use to improve inference in two settings: (1) when text/images act as confounders, and
+(2) when they act as treatments. In the first setting (top right), the treatment-outcome relation is
+confounded by latent features of unstructured data U and observed covariates Z. In the second
+setting (bottom right), T depends on unstructured data and is similarly confounded. Since U
+is unobserved, we apply machine learning to internal representation R to learn a deconfounder
+f(R), a low-dimensional summary that enables unbiased causal inference without modeling the
+generative process or fine-tuning the GenAI model.
+training. Third, by ensuring that the GenAI model is open-source and operates deterministically,
+GPI facilitates scientific replicability. Finally, it is possible to obtain more statistically efficient
+estimates by combining different GenAI models.
+GPI applies machine learning to the internal representation R to estimate a deconfounder f(R),
+which is a low-dimensional function that approximates the latent confounding structure U and is
+sufficient for causal and predictive effect estimation. This step is critical because directly controlling
+for high-dimensional unstructured data X can violate the positivity assumption and lead to biased
+inference (D’Amour et al., 2021). While the deconfounder is not necessarily unique, we formally
+show that any valid f(R) enables nonparametric identification of causal and predictive effects
+when adjusted for alongside observed confounders Z. We propose estimating the deconfounder
+using a deep neural network architecture designed to directly encode these necessary properties.
+The appendix provides theoretical justifications tailored to each application setting.
+1.2 Related Work
+A growing body of work addresses causal inference with unstructured high-dimensional data, often
+by either estimating low-dimensional embeddings (e.g., Veitch et al., 2020; Pryzant et al., 2021; Gui
+and Veitch, 2023; Klaassen et al., 2024) or modeling the data-generating process using parametric
+3
+methods such as topic models (e.g., Fong and Grimmer 2016; Mozer et al. 2020; Roberts et al. 2020;
+Ahrens et al. 2021; Egami et al. 2022). These approaches typically rely on strong assumptions,
+such as the bag-of-words model and fixed embedding schemes, and face substantial challenges due
+to the statistical and computational complexity of high-dimensional unstructured data. This may
+lead to biased estimates and unreliable inference.
+GPI departs from this paradigm by leveraging the internal representations of GenAI models,
+which inherently encode rich semantic information about the generated data and eliminate the
+need to explicitly model or estimate representations. Further, GPI adopts a fully nonparametric
+approach by using neural networks to estimate the deconfounder, outcome model, and propensity
+score model, thereby avoiding restrictive functional form assumptions. This combination of principled representation learning and model flexibility enables more robust causal inference in complex,
+high-dimensional settings.
+2 Applications
+We demonstrate the wide applicability of GPI by reanalyzing three studies under the proposed
+framework: (1) estimating the causal effect of government censorship experience on the subsequent
+censorship or self-censorship (Roberts et al., 2020), (2) estimating the predictive effects of candidates’ facial appearance on electoral outcomes (Lindholm et al., 2024), and (3) estimating the
+persuasiveness of the political rhetoric (Blumenau and Lauderdale, 2022).
+2.1 Text as Confounder
+Social scientists have documented that the Chinese government selectively censors its citizens’ social
+media posts (e.g., Bamman et al., 2012; King et al., 2013). Building on this literature, Roberts
+et al. (2020) investigated whether users whose posts are censored are more likely to face future
+censorship and whether they respond by engaging in self-censorship.
+The authors analyzed data from 75,324 Weibo posts collected by the Weiboscope project (Fu
+et al., 2013), which captures posts in real time and later checks whether they have been removed.
+Each post serves as a focal post, and they constructed three outcome variables: (1) the number
+of posts made by the same user in the four weeks following the focal post, (2) the proportion of
+those posts that were censored during the same time period; and (3) the proportion of posts that
+went missing during the same four-week window. See Appendix S1 for the full details of the data
+preprocessing.
+Because censored and uncensored posts differ systematically, a naive regression of these outcomes on the treatment variable (prior censorship) is likely to yield biased causal estimates. To
+address this confounding bias, the original analysis adjusts for the content of the focal post based
+on a topic model, the post date, and each user’s prior censorship history. We adopt the same
+covariate adjustment strategy within the GPI framework.
+We use two open-source large language models, LLaMA 3 with 8 billion parameters (Grattafiori
+et al., 2024) and Gemma 3 with 1 billion parameters (Mesnard et al., 2024), to regenerate each
+focal post and extract its internal representation. These representations are then used to jointly
+estimate the deconfounder and outcome model within a single neural network architecture. A
+separate neural network is used to estimate the propensity score, conditional on the estimated
+deconfounder and other observed confounders. Both architectures are fine-tuned using Optuna, an
+automated hyperparameter optimization framework (Akiba et al., 2019).
+To estimate the average treatment effect on the treated (ATT), we apply double machine
+learning with two-fold cross-fitting (Chernozhukov et al., 2018). Standard errors are clustered at
+the user level, and extreme propensity scores are truncated following the method proposed by
+Dorn (2025). We also construct the optimal combination of the GPI estimates from the two GenAI
+4
+Number of Posts Rate of Censorship Rate of Missing Posts
+GPI
+(Full)
+GPI
+(Matched)
+Text matching
+(Matched)
+GPI
+(Full)
+GPI
+(Matched)
+Text matching
+(Matched)
+GPI
+(Full)
+GPI
+(Matched)
+Text matching
+(Matched)
+0.00
+0.05
+0.10
+0.15
+0.000
+0.005
+0.010
+0.015
+0.020
+−50
+0
+50
+100
+ATT Estimate
+Combined Gemma−3−1B LLaMA−3−8B Text matching
+Figure 2: Estimated effects of prior censorship experience. For each outcome, we estimate the GPI
+results from LLaMA3 with 8 billion parameters (green) and Gemma3 with 1 billion parameters
+(red) using the full sample (Full) and the matched sample (Matched). We also present results
+from an optimally weighted combination of the two models (blue). We compare GPI estimates
+with those of the text matching approach used in the original analysis (purple). The interval bars
+represent 95% confidence intervals and the standard errors are clustered at the user level.
+models based on their estimated influence functions, which can yield the more efficient estimates.
+Theoretical justifications and further implementation details are provided in Appendix S1.
+Figure 2 compares the results from GPI with those from the text matching approach used in
+the original analysis, which employed coarsened exact matching (Iacus et al., 2012) on estimates
+from the structural topic model (Roberts et al., 2016). For comparison, we apply GPI to both the
+matched sample (628 users, 879 posts) and the full sample (4,155 users; 75,324 posts).
+In contrast to the original analysis, GPI finds that prior censorship significantly reduces users’
+subsequent posting activity, providing evidence of self-censorship. Moreover, GPI reveals a much
+stronger effect of prior censorship on the likelihood of future censorship. Lastly, GPI’s full-sample
+estimates are substantially more efficient than those based on the matched sample, highlighting
+GPI’s advantages in statistical efficiency. These findings are consistent across both LLaMA 3 and
+Gemma 3 models, and their optimal combination on average decreases the standard error by 4.4%.
+To further illustrate GPI’s advantage, we assess robustness to a text-based confounder by
+estimating each method with and without this confounder and calculating the relative absolute
+bias (i.e., the absolute change in point estimates relative to the original estimates without the
+text-based confounder). The text-based confounder of interest is measured as the proportion of
+60 keywords related to censorship or self-censorship as identified by Fu et al. (2013). If a method
+effectively adjusts for the confounding features in focal posts, the additional adjustment for the
+text-based confounder should yield only a small change. We also compute the standard error of
+the relative absolute bias only for GPI, since such a closed-form analytic formula is not available
+for text matching.
+As shown in Table 1, GPI consistently produces smaller relative absolute bias than text matching. In particular, the full-sample analysis shows that GPI estimates change on average by only
+about five percent when the text-based confounder is included, whereas text matching estimates
+5
+GPI (LLaMA3-8B) GPI (Gemma3-1B) Text matching
+Outcome Full Matched Full Matched Matched
+Number of posts 0.084 0.242 0.062 0.370 2.507
+(0.068) (0.682) (0.067) (3.638)
+Rate of censorship 0.007 0.196 0.037 0.132 0.323
+(0.003) (0.140) (0.033) (0.097)
+Rate of missing posts 0.040 0.279 0.124 0.142 0.209
+(0.049) (0.346) (0.042) (0.212)
+Table 1: Relative absolute bias (the absolute change in point estimates from including a textbased confounder, relative to the original estimates) and its standard error (in parentheses). For
+the text-based confounder, we use the proportion of 60 keywords related to censorship or selfcensorship. Standard errors are calculated only for GPI, as an analytic formula is not available
+for text matching. “Full” refers to estimates using the entire sample, while “Matched” refers to
+estimates based on the matched sample.
+change on average by more than 100 percent, suggesting that textual features may not be sufficiently controlled.
+2.2 Predictive Effects of Image Features
+Psychological research has long shown that people infer social attributes — such as trustworthiness
+or competence — from facial appearance (see e.g., Todorov et al., 2015). Building on this literature, Lindholm et al. (2024) examined whether facial appearance predicts electoral outcomes in
+Danish local and national elections. The authors compiled facial photographs of over 7,000 political
+candidates who ran for office in the 2021 local and 2022 general elections.
+The primary predictors of interest are three facial traits previously identified as socially significant: attractiveness, trustworthiness, and competence (Sutherland et al., 2013). To quantify these
+traits, the authors fine-tuned a pre-trained convolutional neural network using the “One Million
+Impressions” dataset (Peterson et al., 2022). The outcome variable is the standardized number of
+votes (using z-scores) received by each candidate. The original analysis employed an ordinary least
+squares (OLS) regression of standardized vote counts on the three facial features, along with three
+confounders—age, gender, and education.
+We apply GPI to this dataset and estimate the predictive effects of facial features, adjusting
+for both observed covariates and latent features embedded in facial appearance. While the original
+analysis did not account for such latent characteristics, candidate photos may contain additional
+visual cues that are predictive of electoral outcomes.
+Each candidate photo is processed using two different versions of Stable Diffusion model (versions 1.5 and 2.1) (Rombach et al., 2022) to extract their internal representations. We then estimate
+the deconfounder and outcome model using the same neural network architecture and fine-tuning
+procedure as the one employed in the previous application. Because the original predictors of
+interest — facial features — are continuous scores, we first discretize them into 10 bins based on
+the sample quantiles and estimate the average predictive effect within each bin. We optimally
+combine the GPI estimates obtained from the two GenAI models as done in the previous section.
+Theoretical justifications and implementation details are provided in Appendix S2.
+Figure 3 compares the GPI estimates to the original OLS results, focusing on the sensitivity
+of predictive effects to additional covariate adjustment (age, gender, and education). Solid and
+dotted lines represent estimates with and without additional covariate adjustment, respectively,
+6
+attractiveness dominance trustworthiness
+GPI (Combined) OLS
+2.5 5.0 7.5 10.0 2.5 5.0 7.5 10.0 2.5 5.0 7.5 10.0
+−0.25
+0.00
+0.25
+0.50
+−0.25
+0.00
+0.25
+0.50
+Trait Value (Quantile)
+Standardized votes received (z−score)
+Covariate Adjustment No Yes
+Figure 3: Estimated predictive effects of three facial traits (Attractiveness, Dominance, and Trustworthiness) using GPI (top) and OLS (bottom). In each panel, solid and dash lines represent
+estimates with and without covariate adjustment, respectively. Blue and red shaded areas indicate
+the corresponding 95% confidence intervals.
+with blue and red shaded bands indicating the corresponding point-wise 95% confidence intervals.
+The GPI estimates exhibit greater robustness to the inclusion of the covariates. Furthermore, GPI
+consistently finds that facial dominance is not statistically significantly associated with electoral
+outcomes, whereas the OLS results vary depending on whether the covariates are included. This
+robustness likely reflects GPI’s ability to account for additional latent features present in candidates’
+facial appearance.
+Finally, we emphasize that GPI substantially reduces the dimensionality of input vector when
+compared to the original image (i.e., colored pixels). In our application, the internal representation
+of Stable Diffusion (for both versions 1.5 and 2.1) is 16,384, which is almost 100 percent smaller
+than the dimensionarity of input vector based on the original image, which is 786,432.
+2.3 Structural Model of Texts
+Political scientists and communication scholars have extensively studied the effectiveness of different rhetorical strategies (e.g., Jerit, 2009; Bos et al., 2013). Contributing this literature, Blumenau
+and Lauderdale (2022) conducted a forced-choice conjoint experiment to evaluate the persuasiveness of different types of political rhetoric. The authors constructed 336 political arguments by
+systematically varying 12 policy issues, 14 rhetorical elements, and position (support or opposition).
+Appendix S3 provides the full list of policy issues and rhetorical features.
+A total of 3,317 participants were each shown four randomly assigned pairs of arguments.
+Within each pair, the arguments addressed the same policy issue but took opposite sides and
+featured different, randomly selected rhetorical elements. Participants were asked to indicate which
+argument they found more persuasive or whether both were equally persuasive, yielding a total of
+13,268 pairwise comparisons. Appendix Table S4 provides one example pair of arguments.
+The authors estimated the latent persuasiveness of rhetorical elements using a parametric structural model similar to the Bradley-Terry model (Bradley and Terry 1952; see Appendix Equa7
+tion (S6)). This model assumes that the probability of one argument being judged more persuasive
+than another is determined by an additive combination of three effects: an interaction effect between policy area and position, the effect of the rhetorical element, and a random effect for each
+individual argument. The random effect accounts for unobserved features of the arguments that
+may influence persuasiveness but are not explicitly measured. In addition, the original analysis
+manually identified several potential confounders—such as argument length—and included them
+as covariates.
+We use GPI to enhance the original analysis by relaxing its strong functional form assumptions.
+We compare the results based on three different LLMs: LLaMA3 with 8 billion parameters, along
+with two more recently released models — LLaMA3.3 with 70 billion parameters, and Gemma 3
+with 1 billion parameters. While all these models are instruction-tuned and thus can be used to
+regenerate each argument and extract the internal representation, the internal representations are
+in different dimensions and contain different information. Our theoretical results imply that the
+results based on these models should be similar.
+Once we extract internal representations, we then estimate a semiparametric version of the
+original structural model, which allows for greater flexibility in capturing complex relationships,
+log 
+P(Yjj′(i) ≤ k)
+P(Yjj′(i) > k)
+
+= δk + µ(Tj , Uj ) − µ(Tj
+′, Uj
+′) (1)
+where Yjj′(i) ∈ {0, 1, 2} denotes the relative persuasiveness of arguments j and j
+′
+shown to respondent i with 0 indicating that argument j is less persuasive than j
+′
+, 1 indicating equal persuasiveness,
+and 2 indicating argument j is more persuasive, The variable Tj ∈ {0, 1, . . . , 13} denotes a rhetorical element used in argument j, and Uj represents latent confounding features of that argument.
+Lastly, µ(Tj , Uj ) is a strength of the argument j, which is a nonparametric function of rhetorical element Tj and other confounding features Uj . The original paper uses a special case of this
+semiparametric formulation, where µ(Tj , Uj ) is constrained to a linear-additive form and Uj only
+captures policy areas and positions.
+We estimate the latent persuasiveness function µ(Tj , Uj ) using a neural network architecture
+and fine-tuning procedure similar to those employed in the previous applications. This approach
+allows us to evaluate the effect of each rhetorical element while adjusting for latent confounding
+features embedded in the arguments. To quantify uncertainty, we use Monte Carlo dropout (Gal
+and Ghahramani, 2016) during inference. Theoretical details and implementation specifics are
+provided in Appendix S3.
+Figure 4 presents the estimated effects of the 14 rhetorical elements. We find that appeals to
+authority is the most persuasive. In contrast, ad hominem attacks—arguments targeting the person
+rather than their position—significantly reduce persuasiveness. These findings are consistent across
+GenAI models and each model’s point estimates are highly correlated (see Appendix Figure S5).
+While these findings are largely consistent with those of the original analysis, the GPI estimates are
+substantially more precise despite the fact that the GPI does not impose parametric assumptions.
+For instance, the original results did not find statistically significant effects for appeals to authority
+or cost/benefit arguments, despite similar point estimates.
+3 Concluding Remarks
+In this paper, we introduced Generative AI-Powered Inference (GPI), a statistical framework that
+harnesses open-source generative AI models to improve causal and predictive inference with unstructured data, such as text and images. GPI extracts internal representations from these models,
+yielding low-dimensional features that preserve the all relevant information that are used to generate the data. By applying machine learning to these representations, GPI enables robust estimation
+8
+Ad hominem
+Metaphor
+Appeal to populism
+Appeal to national greatness
+Public Opinion
+Morality
+Common sense
+Appeal to fairness
+Appeal to history
+Crisis
+Side Effects
+Country comparison
+Cost/benefit
+Appeal to authority/endorsement
+−0.4 −0.2 0.0 0.2
+Latent persuasiveness
+Model LLaMA−3−8B LLaMA−3.3−70B Gemma−3−1B
+Figure 4: Estimated persuasiveness of 14 rhetorical elements in political arguments. We present the
+estimated latent persuasiveness based on LLaMA3 with 8 billion parameters (red circle), LLaMA3.3
+with 70 billion parameters (blue triangle), and Gemma3 with 1 billion parameters (green rectangle).
+Each error bar represents the 95% confidence intervals obtained by Monte Carlo dropout.
+of causal and predictive effects, while also quantifying estimation uncertainty. We demonstrated
+GPI’s broad applicability by revisiting and improving three published empirical studies.
+This work opens several promising avenues for future research. First, developing methods to
+interpret the estimated deconfounders would help researchers better understand the latent confounding features identified by GPI. Second, GPI could be extended to discover effective treatment
+features from unstructured data. While the current framework assumes treatment features are
+predefined and observed, many applications would benefit from discovering novel, more informative treatments. Finally, although we focused on text and image data, the GPI framework can be
+naturally extended to other types of unstructured data, including audio and video.
+References
+Ahrens, M., Ashwin, J., Calliess, J.-P., and Nguyen, V. (2021). Bayesian Topic Regression for
+Causal Inference. arXiv:2109.05317 [cs, stat].
+Akiba, T., Sano, S., Yanase, T., Ohta, T., and Koyama, M. (2019). Optuna: A Next-generation
+Hyperparameter Optimization Framework. In Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining, KDD ’19, pages 2623–2631, New
+York, NY, USA. Association for Computing Machinery.
+Bach, P., Schacht, O., Chernozhukov, V., Klaassen, S., and Spindler, M. (2024). Hyperparameter
+9
+tuning for causal inference with double machine learning: A simulation study. In Causal Learning
+and Reasoning, pages 1065–1117. PMLR.
+Bamman, D., O’Connor, B., and Smith, N. (2012). Censorship and deletion practices in chinese
+social media. First Monday.
+Barrie, C., Palmer, A., and Spirling, A. (2024). Replication for language models problems, principles, and best practice for political science. Working Paper.
+Blumenau, J. and Lauderdale, B. E. (2022). The Variable Persuasiveness of Political Rhetoric. American Journal of Political Science, n/a(n/a). eprint:
+https://onlinelibrary.wiley.com/doi/pdf/10.1111/ajps.12703.
+Bos, L., Van Der Brug, W., and De Vreese, C. H. (2013). An experimental test of the impact of
+style and rhetoric on the perception of right-wing populist and mainstream party leaders. Acta
+Politica, 48:192–208.
+Bradley, R. A. and Terry, M. E. (1952). Rank analysis of incomplete block designs: I. the method
+of paired comparisons. Biometrika, 39(3/4):324–345.
+Chernozhukov, V., Chetverikov, D., Demirer, M., Duflo, E., Hansen, C., Newey, W., and Robins,
+J. (2018). Double/debiased machine learning for treatment and structural parameters. The
+Econometrics Journal, 21(1):C1–C68.
+Christgau, A. M. and Hansen, N. R. (2024). Efficient adjustment for complex covariates: Gaining
+efficiency with dope. arXiv preprint arXiv:2402.12980.
+Daoud, A., Jerzak, C. T., and Johansson, R. (2022). Conceptualizing Treatment Leakage in Textbased Causal Inference. arXiv:2205.00465 [cs].
+Dorn, J. (2025). How much weak overlap can doubly robust t-statistics handle?
+D’Amour, A., Ding, P., Feller, A., Lei, L., and Sekhon, J. (2021). Overlap in observational studies
+with high-dimensional covariates. Journal of Econometrics, 221(2):644–654.
+Egami, N., Fong, C. J., Grimmer, J., Roberts, M. E., and Stewart, B. M. (2022). How to make
+causal inferences using texts. Science Advances, 8(42):eabg2652. Publisher: American Association for the Advancement of Science.
+Farrell, M. H., Liang, T., and Misra, S. (2021). Deep Neural Networks for Estimation and Inference. Econometrica, 89(1):181–213. eprint:
+https://onlinelibrary.wiley.com/doi/pdf/10.3982/ECTA16901.
+Fong, C. and Grimmer, J. (2016). Discovery of Treatments from Text Corpora. In Proceedings
+of the 54th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long
+Papers), pages 1600–1609, Berlin, Germany. Association for Computational Linguistics.
+Fu, K.-w., Chan, C.-h., and Chau, M. (2013). Assessing censorship on microblogs in china: Discriminatory keyword analysis and the real-name registration policy. IEEE internet computing,
+17(3):42–50.
+Gal, Y. and Ghahramani, Z. (2016). Dropout as a bayesian approximation: Representing model
+uncertainty in deep learning. In international conference on machine learning, pages 1050–1059.
+PMLR.
+10
+Gouk, H., Frank, E., Pfahringer, B., and Cree, M. J. (2021). Regularisation of neural networks by
+enforcing lipschitz continuity. Machine Learning, 110:393–416.
+Grattafiori, A., Dubey, A., Jauhri, A., Pandey, A., Kadian, A., Al-Dahle, A., Letman, A., Mathur,
+A., Schelten, A., Vaughan, A., et al. (2024). The llama 3 herd of models. arXiv preprint
+arXiv:2407.21783.
+Gui, L. and Veitch, V. (2023). Causal Estimation for Text Data with (Apparent) Overlap Violations. arXiv:2210.00079 [cs, stat].
+Iacus, S. M., King, G., and Porro, G. (2012). Causal inference without balance checking: Coarsened
+exact matching. Political analysis, 20(1):1–24.
+Imai, K. and Nakamura, K. (2024). Causal representation learning with generative artificial intelligence: Application to texts as treatments. arXiv preprint arXiv:2410.00903.
+Jerit, J. (2009). How predictive appeals affect policy opinions. American Journal of Political
+Science, 53(2):411–426.
+King, G., Pan, J., and Roberts, M. E. (2013). How Censorship in China Allows Government
+Criticism but Silences Collective Expression. American Political Science Review, 107(2):326–
+343.
+Klaassen, S., Teichert-Kluge, J., Bach, P., Chernozhukov, V., Spindler, M., and Vijaykumar, S.
+(2024). DoubleMLDeep: Estimation of Causal Effects with Multimodal Data. arXiv:2402.01785
+[cs, econ, stat].
+Lindholm, A., Hjorth, C., and Schuessler, J. (2024). Facial finetuning: using pretrained image
+classification models to predict politicians’ success. Political Science Research and Methods,
+pages 1–11.
+Mesnard, T., Hardin, C., Dadashi, R., Bhupatiraju, S., Pathak, S., Sifre, L., Rivi`ere, M., Kale,
+M. S., Love, J., Tafti, P., Hussenot, L., Sessa, P. G., Chowdhery, A., Roberts, A., Barua, A.,
+Botev, A., Castro-Ros, A., Slone, A., H´eliou, A., Tacchetti, A., Bulanova, A., Paterson, A., Tsai,
+B., Shahriari, B., Lan, C. L., Choquette-Choo, C. A., Crepy, C., Cer, D., Ippolito, D., Reid, D.,
+Buchatskaya, E., Ni, E., Noland, E., Yan, G., Tucker, G., Muraru, G.-C., Rozhdestvenskiy, G.,
+Michalewski, H., Tenney, I., Grishchenko, I., Austin, J., Keeling, J., Labanowski, J., Lespiau,
+J.-B., Stanway, J., Brennan, J., Chen, J., Ferret, J., Chiu, J., Mao-Jones, J., Lee, K., Yu, K.,
+Millican, K., Sjoesund, L. L., Lee, L., Dixon, L., Reid, M., Miku la, M., Wirth, M., Sharman, M.,
+Chinaev, N., Thain, N., Bachem, O., Chang, O., Wahltinez, O., Bailey, P., Michel, P., Yotov, P.,
+Chaabouni, R., Comanescu, R., Jana, R., Anil, R., McIlroy, R., Liu, R., Mullins, R., Smith, S. L.,
+Borgeaud, S., Girgin, S., Douglas, S., Pandya, S., Shakeri, S., De, S., Klimenko, T., Hennigan,
+T., Feinberg, V., Stokowiec, W., hui Chen, Y., Ahmed, Z., Gong, Z., Warkentin, T., Peran, L.,
+Giang, M., Farabet, C., Vinyals, O., Dean, J., Kavukcuoglu, K., Hassabis, D., Ghahramani, Z.,
+Eck, D., Barral, J., Pereira, F., Collins, E., Joulin, A., Fiedel, N., Senter, E., Andreev, A., and
+Kenealy, K. (2024). Gemma: Open models based on gemini research and technology.
+Mozer, R., Miratrix, L., Kaufman, A. R., and Anastasopoulos, L. J. (2020). Matching with Text
+Data: An Experimental Evaluation of Methods for Matching Documents and of Measuring Match
+Quality. Political Analysis, 28(4):445–468. Publisher: Cambridge University Press.
+11
+Peterson, J. C., Uddenberg, S., Griffiths, T. L., Todorov, A., and Suchow, J. W. (2022).
+Deep models of superficial face judgments. Proceedings of the National Academy of Sciences,
+119(17):e2115228119.
+Pryzant, R., Card, D., Jurafsky, D., Veitch, V., and Sridhar, D. (2021). Causal Effects of Linguistic
+Properties. arXiv:2010.12919 [cs].
+Roberts, M. E., Stewart, B. M., and Airoldi, E. M. (2016). A Model of Text for Experimentation in the Social Sciences. Journal of the American Statistical Association, 111(515):988–1003.
+Publisher: Taylor & Francis eprint: https://doi.org/10.1080/01621459.2016.1141684.
+Roberts, M. E., Stewart, B. M., and Nielsen, R. A. (2020). Adjusting for Confounding with Text Matching. American Journal of Political Science, 64(4):887–903. eprint:
+https://onlinelibrary.wiley.com/doi/pdf/10.1111/ajps.12526.
+Rombach, R., Blattmann, A., Lorenz, D., Esser, P., and Ommer, B. (2022). High-Resolution Image
+Synthesis With Latent Diffusion Models. pages 10684–10695.
+Rubin, D. B. (1990). Comments on “On the application of probability theory to agricultural
+experiments. Essay on principles. Section 9” by J. Splawa-Neyman translated from the Polish
+and edited by D. M. Dabrowska and T. P. Speed. Statistical Science, 5:472–480.
+Shalit, U., Johansson, F. D., and Sontag, D. (2017). Estimating individual treatment effect:
+generalization bounds and algorithms. arXiv:1606.03976 [cs, stat].
+Shi, C., Blei, D., and Veitch, V. (2019). Adapting Neural Networks for the Estimation of Treatment
+Effects. In Advances in Neural Information Processing Systems, volume 32. Curran Associates,
+Inc.
+Sutherland, C. A., Oldmeadow, J. A., Santos, I. M., Towler, J., Burt, D. M., and Young, A. W.
+(2013). Social inferences from faces: Ambient images generate a three-dimensional model. Cognition, 127(1):105–118.
+Todorov, A., Olivola, C. Y., Dotsch, R., and Mende-Siedlecki, P. (2015). Social attributions
+from faces: Determinants, consequences, accuracy, and functional significance. Annual review of
+psychology, 66(1):519–545.
+Veitch, V., Sridhar, D., and Blei, D. M. (2020). Adapting Text Embeddings for Causal Inference.
+arXiv:1905.12741 [cs, stat].
+12
+Supplementary Materials
+S1 Text as Confounder
+In this section, we provide a formal theoretical justification of our methodology introduced in
+Section 2.1 and its implementation details.
+S1.1 Theoretical Properties
+Our approach extends the method proposed by Imai and Nakamura (2024) to the case of text as
+confounder. We begin by defining the causal quantity of interest. We then establish its nonparametric identification and develop an estimation strategy.
+S1.1.1 Assumptions and Identification
+Suppose we observe a sample of N independent and identically distributed (i.i.d.) units i = 1, . . . , N
+from a population of interest. For each unit i, we observe a treatment assignment Ti ∈ T ⊂ R
+and an observed outcome Yi ∈ Y ⊂ R, where T and Y denote the support of the treatment and
+that of the outcome, respectively. Additionally, we observe a set of covariates Zi ∈ Z ⊂ R
+d and
+unstructured high-dimensional objects (e.g., texts or images) Xi ∈ X ⊂ R
+r
+, which also serve as
+confounders.
+We adopt the potential outcomes framework for causal inference and assume the standard
+consistency assumption (Rubin, 1990). Specifically, we assume that the potential outcome, denoted
+by Yi(t), depends solely on the treatment assigned to unit i, not on the treatment assignments of
+other units. This is formalized as follows:
+Assumption 1 (Consistency) The potential outcome under the treatment t ∈ T is denoted by
+Yi(t), and equals to the observed outcome Yi under the realized treatment assigment Ti:
+Yi = Yi(Ti)
+We are interested in estimating the marginal distribution of the potential outcome under treatment condition Ti = t for some t ∈ T (i.e., P(Yi(t) = y)). This can be used to estimate the
+average treatment effect (ATE) and other causal quantities of interest. We consider the strong latent ignorability assumption; conditional on the observed covariates and certain unknown features
+of the high-dimensional unstructured objects, potential outcomes are independent of treatment
+assignment.
+Assumption 2 (Strong Latent Ignorability with Unknown Confounding Features) There
+exists a deterministic function gU : X → U that maps an unstructured object Xi on to the lowdimensional confounding features Ui ∈ U with dim(U) ≪ dim(X) such that the potential outcomes
+are independent of the treatment assignment given the observed covariates Zi and the confounding
+features Ui = gU (Xi):
+{Yi(t)}t∈T ⊥⊥ Ti
+| Zi = z, Ui = u,
+where P(Ti = t | Zi = z, Ui = u) > 0 for all t ∈ T , z ∈ Z, and u ∈ U.
+Importantly, we assume the existence of low-dimensional features Ui
+, which are deterministic
+functions of the unstructured objects and sufficient to satisfy the strong ignorability assumption.
+We do not condition directly on the high-dimensional unstructured objects Xi
+, as such data (e.g.,
+texts or images) can often perfectly predict treatment assignment, thereby violating the positivity
+13
+condition and inducing significant bias in estimates (D’Amour et al., 2021). Prior work either
+overlooks this issue (e.g., Veitch et al. 2020; Klaassen et al. 2024) or addresses it by using textbased matching (e.g., Roberts et al. 2020; Mozer et al. 2020). Matching is not well suited for
+high-dimensional controls and the reliance on parametric propensity score models such as topic
+models leads to bias. In contrast, our method assumes only the existence of low-dimensional
+confounding features Ui
+.
+Finally, we assume that unstructured objects are generated by a deep generative model. When
+the existing image and text are of interest, we can regenerate them by appropriately prompting a
+deep generative model. Following Imai and Nakamura (2024), we adopt a broad definition of deep
+generative model to encompass LLMs and other foundation models.
+Definition 1 (Deep Generative Model) A deep generative model is the following probabilistic
+model that takes prompt Pi as an input and generates the unstructured object Xi as an output:
+P(Xi
+| hγ(Ri))
+P(Ri
+| Pi)
+where Ri ∈ R ⊂ R
+d denotes an internal representation of Xi contained in the model and hγ(Ri)
+is a deterministic function parameterized by γ that completely characterizes the conditional distribution of Xi given Ri.
+Under this definition of deep generative model, R represents a lower-dimensional representation of
+the unstructured object X and is a hidden representation of neural networks. We assume that the
+last layer of the deep generative model is a deterministic function of the internal representation Ri so
+that the low-dimensional features of the unstructured object Ui can be regarded as a deterministic
+function of the low-dimensional internal representation Ri of the deep generative model.
+Assumption 3 (Deterministic Decoding) The output layer of a deep generative model is deterministic. That is, P(Xi
+| hγ(Ri)) in Definition 1 is a degenerate distribution.
+Importantly, we only require that Ri deterministically generates the unstructured object Xi
+.
+For example, some generative models, especially diffusion models, have an internal architecture
+that is stochastic, but the output of the decoder layer can be made deterministic so that GPI
+is still applicable. In the case of LLMs, Barrie et al. (2024) shows that due to updates to the
+internal parameters, the outputs of LLMs are not generally replicable over time. However, in this
+context, we are only concerned with the deterministic relationship between Ri and Xi
+, which can
+be controlled by selecting appropriate hyperparameters for any given LLM.
+Figure S1 presents a directed acyclic graph (DAG) that summarizes the data generating process
+and assumptions described above. In this DAG, an arrow with double red-colored lines represents
+a deterministic causal relation while an arrow with a single line represents a stochastic causal
+relation. The dashed line bidirectional arrow represents the potential independence relation.
+Given this setup, we establish the nonparametric identification of the marginal distribution of
+the potential outcome under the treatment condition Ti = t for any given t ∈ T . We extend the
+results of Imai and Nakamura (2024) to the case of unstructured objects as confounder, accommodating potentially non-binary treatments and observed structured confounders.
+We show that there exists a deconfounder function f(Ri) satisfying the conditional independence relation Yi⊥⊥Ri
+| Ti
+, Zi
+, f(Ri), where f(Ri) is a deterministic function of the internal representation Ri
+. The existence of such a function is guaranteed by Assumptions 2 and 3, since Ui
+is a deterministic function of Ri and satisfies the conditional independence condition. Moreover,
+14
+P R hγ(R) X U = gU (X)
+T
+Y
+Z
+Deep generative model
+Figure S1: Directed Acyclic Graph of the Assumed Data-Generating Process with an Unstructured
+Confounder. An unstructured object X (e.g., an image or text) is generated via a deep generative
+model (shown as a rectangle), where a prompt P produces an internal representation R, which
+is then transformed into X by the function hγ(R). The causal relationship between treatment T
+and outcome Y is confounded by both observed structured covariates Z and latent confounding
+features U embedded within the unstructured object X. Arrows with red double lines represent
+deterministic causal relationships; single-lined arrows denote possibly stochastic relationships; and
+dashed bidirectional arrows indicate potential independence.
+any deconfounder function that satisfies the conditional independence relation leads to the same
+identification formula.
+Proposition 1 (Nonparametric Identification) Under Assumptions 1 and 2, there exists a
+deconfounder function f : R
+r
+7→ R
+q with q ≤ r that satisfies the following independence relation:
+Yi⊥⊥Ri
+| Ti
+, Zi
+, f(Ri).
+By adjusting this deconfounder, we can nonparametrically identify the marginal distribution of the
+pothentical outcome under the treatment condition Ti = t as,
+P(Yi(t) = y) = Z
+Rq
+Z
+Z
+P(Yi = y | Ti = t, Zi
+, f(Ri))dF(Zi)dF(Ri) (S1)
+where y ∈ Y.
+See Section S4.1 for the proof.
+S1.1.2 Estimation and Inference
+Given the identification formula, we now turn to estimation and statistical inference. We extend
+the estimation procedure of Imai and Nakamura (2024) to the current setting. Our strategy relies
+on two key observations. First, Assumption 2 implies that the deconfounder is not a post-treatment
+variable. Second, the deconfounder must satisfy the conditional independence condition stated in
+Equation (S1).
+We use a neural network architecture that extends TarNet (Shalit et al., 2017) to non-binary
+treatment and structured confounding variables to estimate the conditional potential outcome
+function given the deconfounder and observed control variables, i.e.,
+µTi
+(f(Ri), Zi) = E[Yi(t) | f(Ri), Zi
+]
+Our proposed neural network architrcture, which is summarized in Figure S2, simultaneously estimates the deconfounder f(Ri) and the conditional potential outcome function µTi
+(f(Ri), Zi) :=
+15
+Ri f(Ri
+;λ)
+Zi
+Ti
+µTi
+(f(Ri
+;λ), Zi
+; θ) Yi
+Figure S2: Diagram Illustrating the Proposed Model Architecture when Unstructured Object is
+Confounder. The proposed model takes an internal representation of unstructured object Ri as
+an input, and finds a deconfounder f(Ri), which is a lower-dimensional representation of Ri
+, and
+then use it together with the treatment Ti and structured confounder Zi to predict the conditional
+expectation of the outcome µTi
+(f(Ri), Zi) := E[Yi
+| Ti
+, f(Ri), Zi
+]. The architecture encodes the
+conditional independence relation Yi ⊥⊥ Ri
+| Ti
+, Zi
+, f(Ri).
+E[Yi
+| Ti
+, f(R), Zi
+], by first projecting the internal representation Ri onto a lower dimensional
+space of deconfounder f. We then use the estimated deconfounder, treatment vector Ti
+, and observed structured confounders Zi
+, we predict the conditional potential outcome function µTi by
+minimizing the following loss function:
+{λˆ, θˆ} = argmin
+λ,θ
+1
+N
+X
+N
+i=1
+{Yi − µTi
+(f(Ri
+;λ), Zi
+; θ)}
+2
+, (S2)
+where λ is the parameter of the deconfounder function f(Ri), and θ is the parameter of the
+conditional potential outcome function µ(f(Ri), Ti
+, Zi
+; θ).
+Importantly, our method is different from the existing methods of causal inference for texts
+because we do not predict treatment assignment given the internal representation. The joint
+estimation of treatment assignment and outcome models, as done in the methods like DragonNet
+(Shi et al., 2019), leads to P(Ti = 1 | f(Ri), Zi) = P(Ti = 1 | Ri
+, Zi). As a result, these methods are
+likely to violate the positivity assumption. The recent literature on causal representation learning
+demonstrates that we can achieve the efficient estimation by combining the internal low-dimensional
+representation and propensity score models (Christgau and Hansen 2024).
+Given the proposed neural network architecture, we estimate the Average Treatment Effect
+for the Treated (ATT) using double machine learning (DML) (Chernozhukov et al., 2018). We
+estimate ATT to compare our result with the original analysis based on text matching. Here, we
+propose to estimate the propensity score model as a function of the estimated deconfounder, i.e.,
+πt(f(Ri), Zi) = P(Ti = t | f(Ri), Zi) so that we do not directly condition on the high-dimensional
+unstructured objects.
+To ensure the asymptotic normality discussed later in this section, the propensity score model
+must be Lipschitz-continuous; accordingly, we employ a neural network with spectral normalization
+(Gouk et al., 2021). Practical implementation requires careful tuning of the hyperparameters for
+both the outcome and propensity score models, including network width and depth, learning rate,
+batch size, dropout rate, and number of epochs. We automate this with advanced hyperparameteroptimization tools such as Optuna (Akiba et al., 2019).
+As an example, we present the entire estimation procedure in the case of binary treatment
+T = {0, 1}. Denote the observed data by D := {Di}
+N
+i=1 where Di
+:= {Yi
+, Ti
+, Ri
+, Zi}. We use the
+following K-fold cross-fitting procedure, assuming that N is divisible by K.
+1. Randomly partition the data into K folds of equal size where the size of each fold is n = N/K.
+16
+The observation index is denoted by I(i) ∈ {1, . . . , K} where I(i) = k implies that the ith
+observation belongs to the kth fold.
+2. For each fold k ∈ {1, · · · , K}, use observations with I(i) ̸= k as training data:
+(a) further split the training data into two folds, I
+(−k)
+1
+and I
+(−k)
+2
+(b) simultaneously obtain an estimated deconfounder and an estimated conditional outcome
+function on the first fold, which are denoted by fˆ(−k)
+({Ri
+, Zi}
+i∈I
+(−k)
+1
+) := f({Ri
+, Zi}
+i∈I
+(−k)
+1
+;λˆ(−k)
+)
+and ˆµ
+(−k)
+t
+({Ri
+, Zi}
+i∈I
+(−k)
+1
+) := µt(f({Ri}
+i∈I
+(−k)
+1
+, Zi
+;λˆ(−k)
+); θˆ(−k)
+), respectively, by solving the optimization problem given in Equation (S2), and
+(c) obtain an estimated propensity score given the estimated deconfounder on the second
+fold, which is denoted by ˆπ
+(−k)
+(fˆ(−k)
+({Ri}
+i∈I
+(−k)
+2
+), Zi) := ˆπ
+(−k)
+(f({Ri}
+i∈I
+(−k)
+2
+;λˆ(−k)
+), Zi).
+3. Compute the ATT estimator ˆτ as a solution to:
+1
+nK
+X
+K
+k=1
+X
+i:I(i)=k
+ψ(Di
+; ˆτ, fˆ(−k)
+, µ
+(−k)
+0
+, πˆ
+(−k)
+) = 0,
+where
+ψ(Di
+; τ, f, µ0, π)
+=
+Ti(Yi − µ0(f(Ri), Zi)
+P(Ti = 1) −
+π(f(Ri), Zi)(1 − Ti)(Yi − µ0(f(Ri), Zi))
+P(Ti = 1)(1 − π(f(Ri), Zi)) −
+Tiτ
+P(Ti = 1).
+(S3)
+Finally, we establish the asymptotic properties of the proposed estimator in the case of binary
+treatment. We assume that the following regularity conditions hold. These conditions are similar
+to those in Imai and Nakamura (2024) except that we also condition on the observed covariates Zi
+.
+Assumption 4 (Regularity Conditions) Let c1, c2, and q > 2 be positive constants and δn
+be a sequence of positive constants approaching zero as the sample size n increases. Then, the
+following conditions hold.
+(a) (Primitive conditions)
+E[|Yi
+|
+q
+]
+1/q ≤ c1, sup
+r∈R,z∈Z
+E[|Yi − µTi
+(f(r), z)|
+2
+| Ri = r, Zi = z] ≤ c1,
+E[|Yi − µTi
+(f(Ri), Zi)|
+2
+]
+1/2 ≥ c2.
+(b) (Outcome model estimation)
+E[|µˆTi
+(fˆ(Ri), Zi) − µTi
+(f(Ri), Zi)|
+q
+]
+1/q ≤ c1, E[|µˆTi
+(fˆ(Ri), Zi) − µTi
+(f(Ri), Zi)|
+2
+]
+1/2 ≤ δnn
+−1/4
+.
+(c) (Deconfounder estimation)
+E
+h
+
+fˆ(Ri) − f(Ri)
+
+
+
+q
+i1/q
+≤ c1, E
+
+
+fˆ(Ri) − f(Ri)
+
+
+
+2
+1/2
+≤ δnn
+−1/4
+(d) (Propensity score estimation) π(·) is Lipschitz continuous at the every point of its support,
+and satisfies:
+E[|πˆ(f(Ri), Zi) − π(f(Ri), Zi)|
+q
+]
+1/q ≤ c1, E[|πˆ(f(Ri), Zi) − π(f(Ri), Zi)|
+2
+]
+1/2 ≤ δnn
+−1/4
+.
+17
+These regularity conditions are standard in the DML literature, and it is known that the neural
+network architecture with an appropriate depth and width can achieve the required convergence
+rates (Farrell et al., 2021). The propensity score requires the Lipschitz continuity condition, which
+can be satisfied by using a regularized neural network architecture (Gouk et al., 2021).
+Given the above assumptions, the asymptotic normality of the proposed estimator follows
+immediately from the DML theory.
+Theorem 1 (Asymptotic Normality of the ATT Estimator) Under Assumptions 1–4, the
+estimator τˆ obtained from the influence function ψ satisfies asymptotic normality:
+√
+N(ˆτ − τ )
+σ
+d−→ N (0, 1)
+where σ
+2 = E[ψ(Di
+; τ, f, µ1, µ0, π1)
+2
+].
+We omit the proof as it is identical to Theorem 1 of Imai and Nakamura (2024).
+When we have internal representations from different LLMs, we can combine the estimates
+based on them to improve statistical efficiency. The following proposition establishes the asymptotic
+normality of such combined estimator in the case of the two GenAI models. The extension to more
+than two GenAI models is straightforward.
+Proposition 2 (Asymptotic Normality of the Combined Estimator) Suppose that we have
+two different GenAI models that give two different internal representations. Let Dij = {Yi
+, Ti
+, Rij , Zi}
+be the observed data obtained from the jth GenAI model for j = 1, 2, where Rij is the internal
+representation obtained from the jth GenAI model. Let τˆj be the ATT estimators obtained from
+the jth GenAI model and ψj (Dij ) = ψj (Dij ; τ, fj , µ1j , µ0j , π1j ) be the influence function for τˆj for
+j = 1, 2, where fj , µtj , and π1j are the true deconfounder, outcome model, and propensity score
+model for the jth GenAI model, respectively. Under Assumptions 1–4 for each GenAI model, the
+combined estimator τˆcomb = ωτˆ1 + (1 − ω)ˆτ2 for any weight ω satisfies asymptotic normality:
+√
+N
+(ˆτcomb − τ )
+σcomb
+d−→ N (0, 1)
+where σ
+2
+comb = E[(ωψ1(Di1) + (1 − ω)ψ2(Di2))2
+]. Moreover, the combined estimator achieves the
+minimum asymptotic variance at the optimal weight
+ω
+∗ =
+E[ψ2(Di2)
+2
+] − E[ψ1(Di1)ψ2(Di2)]
+E[ψ1(Di1)
+2] + E[ψ2(Di2)
+2] − 2E[ψ1(Di1)ψ2(Di2)].
+The proof is given in Appendix S4.2.
+S1.2 Implementation Details for the Empirical Application
+We reanalyze the dataset used by Roberts et al. (2020), which is based on data from the Weiboscope
+project (Fu et al., 2013). This project collected Weibo posts in real time and subsequently revisited
+them to determine whether they had been censored. The original analysis focused on users who
+experienced at least one instance of censorship during the first half of 2012, and examined their
+subsequent posts in the second half of that year. To construct the control group, the authors
+selected posts that had a cosine similarity greater than 0.5 to a censored post and were posted
+on the same day. Posts shorter than 15 characters were excluded. The final dataset we analyze
+consists of 75,324 posts from 4,155 Weibo users.
+Based on the treatment and control “focal” posts, three outcome variables were constructed:
+18
+1. The number of posts made by the same user within the four weeks following the focal post
+2. The proportion of those posts that were censored (as indicated by a “permission denied”
+message)
+3. The proportion of posts that went missing (as indicated by a “Weibo does not exist” message)
+It is important to note that the second and third outcomes capture different types of post removals.
+As noted by Fu et al. (2013), a “permission denied” message is a clear signal of censorship, whereas
+“Weibo does not exist” may reflect either censorship or voluntary deletion by the user. To adjust
+for users’ baseline behavior, the same three measures were also computed for the four-week period
+preceding each focal post and included as confouding variables.
+We apply the GPI methodology as follows. First, we use LLaMA 3 (8 billion parameters) and
+Gemma 3 (1 billion parameters) to regenerate all posts in the dataset and extract the internal representation of the last token. Due to the autoregressive nature of generative models, this final-token
+representation captures the full information of each post. The resulting internal representation,
+denoted by Ri
+, has a dimensionality of 4096 for LLaMA3 and 1152 for Gemma3. Using this representation, we estimate the deconfounder f(Ri) and the outcome model µTi
+(f(Ri), Zi) via a neural
+network architecture described in the previous section.
+To train the model for each outcome variable, we employed two-fold cross-validation on the
+full sample, following the recommendation of Bach et al. (2024). The hyperparameter search space
+included:
+• Learning rate: 10−7
+to 10−4
+• Dropout rate: 0.05 to 0.3
+• Outcome model architecture: single-layer MLP with ReLU activation and 50, 100, or 200
+hidden units
+• Deconfounder architecture: two-layer MLP with ReLU activation and hidden unit configurations of [256, 128], [512, 256], or [1024, 512]
+We automated hyperparameter optimization using Optuna (Akiba et al., 2019), selecting the
+best parameters based on validation loss across 100 trials. For both hyperparameter tuning and
+nuisance function estimation, models were trained for up to 10000 epochs, with early stopping
+triggered if validation loss failed to improve for 5 consecutive epochs. We used the Adam optimizer
+with a batch size of 256 and a weight decay of 10−8
+to prevent overfitting. To stabilize training, we
+applied gradient clipping with a maximum norm of 1.0. The optimal hyperparameter configurations
+for each outcome measure are reported in Table S1.
+After selecting the optimal hyperparameters, we estimated the Average Treatment Effect for the
+Treated (ATT) for each outcome using the Double Machine Learning (DML) procedure described
+in the previous section. Specifically, we implemented 2-fold cross-fitting to estimate the nuisance
+components: the deconfounder f(Ri), the outcome model µTi
+(f(Ri), Zi), and the propensity score
+π(f(Ri), Zi).
+The deconfounder and outcome model were trained using the selected hyperparameters for
+up to 10000 epochs, with early stopping triggered if the validation loss did not improve for five
+consecutive epochs. For propensity score estimation, we used a neural network with spectral
+normalization (Gouk et al., 2021) to enforce Lipschitz continuity. This network consisted of a twolayer MLP with ReLU activation, using 128 hidden units in the first layer and 64 in the second.
+19
+Model Outcome Learning Rate Dropout Outcome Model Deconfounder
+LLaMA3 Number of Posts 1.188 × 10−7 0.051 [100, 1] [1024, 512]
+(8B) Rate of Censorship 9.974 × 10−5 0.161 [100, 1] [1024, 512]
+Rate of Missing Posts 9.858 × 10−5 0.118 [50, 1] [1024, 512]
+Gemma3 Number of Posts 2.726 × 10−7 0.094 [100, 1] [1024, 512]
+(1B) Rate of Censorship 7.678 × 10−5 0.276 [50,1] [1024, 512]
+Rate of Missing Posts 7.499 × 10−5 0.154 [50,1] [512, 256]
+Table S1: Optimal hyperparameters selected for each outcome measure using Optuna. The table
+lists the learning rate, dropout rate, outcome model architecture, and deconfounder architecture
+applied to the reanalysis of Roberts et al. (2020).
+The learning rate was fixed at 10−5
+, and the model was trained under the same early stopping
+criteria.
+ATT was then computed using Equation (3), with standard errors derived from the influence
+function in Equation (S3). To account for within-user correlation, we clustered standard errors
+at the user level. For consistency with the original study’s text matching approach, we estimated
+the ATT using both the full sample and the matched sample from the original analysis. We also
+consider the optimal combinations of the estimates from the two LLMs using the optimal weights
+in Theorem 2 so that we can have more efficient results.
+For comparison, we replicated the text matching procedure proposed by Roberts et al. (2020),
+following their publicly available replication materials. Specifically, we fit a structural topic model
+with 100 topics, incorporating the censorship indicator (treatment) as a covariate. From this model,
+we obtained both the estimated topic proportions and treatment projections for each post.
+GPI (LLaMA3-8B) GPI (Gemma3-1B) GPI (Combined) Text matching
+Outcome Full Matched Full Matched Full Matched Matched
+Rate of censorship 0.012 0.018 0.011 0.015 0.011 0.017 0.004
+(0.000) (0.002) (0.000) (0.002) (0.000) (0.002) (0.001)
+Rate of missing posts 0.065 0.100 0.070 0.099 0.067 0.099 0.050
+(0.003) (0.022) (0.003) (0.023) (0.003) (0.021) (0.016)
+Number after event -16.200 -14.700 -14.400 -4.330 -15.600 -7.690 11.500
+(2.600) (21.900) (2.690) (21.300) (2.560) (21.100) (41.200)
+Table S2: Estimated Average Treatment Effects for the Treated (ATT) using GPI with LLaMA3
+(8B), Gemma3 (1B), their optimal combination, and text matching (Roberts et al., 2020). Standard
+errors (reported in parentheses) are clustered at the user level. The table presents results for both
+the full sample and the matched sample.
+Next, we applied coarsened exact matching (CEM) to pair censored posts with uncensored ones
+based on four criteria: (1) topic proportions, (2) treatment projection, (3) post date, and (4) prior
+censorship history. This matching procedure yielded a final sample of 879 posts from 628 users.
+Using the matched sample and weights generated by CEM, we compared treatment and control
+posts across the three outcome measures described earlier. As in the main analysis, standard errors
+were clustered at the user level to account for within-user correlation.
+20
+S1.3 Examining the Robustness to the Inclusion of Additional Covariates
+To further assess the robustness of our approach, we examine how much the point estimate changes
+when we additionally adjust for the textual features that might act as a confounder. Specifically,
+we estimate both the GPI and text matching methods with and without directly controlling the
+text features, and calculate the relative absolute bias (i.e., the absolute change in point estimates
+divided by the absolute value of the original point estimates). For GPI, we can further calculate
+the standard error of the relative absolute bias using the delta method, as shown below.
+Formally, let τlong and τshort be the parameter of interest obtained from GPI with and without
+controlling the text features, respectively, and let Ci be the text-based confounding feature for post
+i. Then, the relative absolute bias is defined as
+R =
+|τlong − τshort|
+|τshort|
+.
+Let ψlong and ψshort be the influence functions of τlong and τshort, respectively. As they are influence
+function, we have
+√
+N
+
+τˆlong − τlong
+τˆshort − τshort
+=
+1
+√
+N
+Xn
+i=1
+
+ψlong(Di
+, Ci
+; τlong, flong, µ1,long, µ0,long, πlong)
+ψshort(Di
+; τshort, fshort, µ1,short, µ0,short, πshort)
+
++ oP (1)
+where flong, µt,long, and πlong are the nuisance functions estimated when controlling the text features, and fshort, µt,short, and πshort are those estimated without controlling the text features. By
+the multivariate central limit theorem, we have
+√
+N
+
+τˆlong − τlong
+τˆshort − τshort
+d−→ N 0
+0
+
+,
+
+σ
+2
+long σlong,short
+σlong,short σ
+2
+short
+
+where σ
+2
+long = E[ψ
+2
+long], σ
+2
+short = E[ψ
+2
+short], and σlong,short = E[ψlongψshort]. Then, under the assumption that τshort ̸= 0 and τlong − τshort ̸= 0, by the delta method, we have
+√
+n(Rˆ − R)
+d−→ N (0, V )
+where
+V = ∇g
+⊤
+
+σ
+2
+long σlong,short
+σlong,short σ
+2
+short
+
+∇g
+with g(x, y) = |x − y|/|y| and ∇g = (∂g/∂x, ∂g/∂y)
+⊤ evaluated at (τlong, τshort).
+To calculate the relative absolute bias, we use a set of 60 keywords identified by Fu et al. (2013):
+(1) 30 keywords with the highest relative frequency in censored posts compared to uncensored ones,
+and (2) 30 keywords most frequent among self-censoring users relative to others (as reported in
+Appendix Tables 1a and 1b of Fu et al. 2013). Then, our candidate confounder is the proportion
+of these keywords in each post.
+S2 Predictive Effects of Image Features
+In this section, we provide a formal theoretical justification of our methodology introduced in
+Section 2.2 and its implementation details.
+21
+S2.1 Theoretical Properties
+While, strictly speaking, we are interested in predictive effects (i.e., difference in predicted outcome
+when a predictor of interest takes different values while holding other variables at their observed
+values) rather than causal effects, below we consider the identification and estimation of the latter,
+which requires more stringent assumptions. It is worth noting that estimated predictive effects
+remain valid even when they cannot be interpreted as causal effects due to the violation of additional
+assumptions.
+Our identification results are nearly identical to the those of Imai and Nakamura (2024), with
+the key difference that we focus on images rather than texts, and additionally incorporate observed
+structured confounding variables. For estimation and inference, however, we extend their methodology to accommodate a multi-valued treatment. As in the previous section, we define the causal
+estimand of interest, establish its nonparametric identification, and then develop an appropriate
+estimation strategy.
+S2.1.1 Assumptions and Identification
+Suppose we observe a sample of N i.i.d. units i = 1, . . . , N from a population of interest. For each
+unit i, we observe an unstructured treatment object Xi ∈ X ⊂ R
+r
+(e.g., images or texts) and an
+observed outcome Yi ∈ Y ⊂ R. Additionally, we observe a set of structured confounding variables
+Zi ∈ Z ⊂ R
+d
+. As in the previous section, we assume that the treatment object Xi
+is generated
+by a deep generative model defined in Definition 1 and that the last layer of the deep generative
+model is a deterministic function of the internal representation Ri (Assumption 3).
+As before, we adopt the potential outcome framework. We denote the potential outcome under
+the treatment object x ∈ X by Yi(x), which is defined as the outcome that would be observed if
+unit i were to receive treatment object x. The observed outcome is denoted by Yi and is defined
+as the potential outcome under the realized treatment object Xi
+, i.e., Yi = Yi(Xi). This notation
+assumes no interference between units and no hidden multiple version of treatment objects (Rubin,
+1990). This is formalized as follows:
+Assumption 5 (Consistency) The potential outcome under the treatment object x ∈ X is denoted by Yi(x) and equals the observed outcome Yi under the realized treatment object Xi:
+Yi = Yi(Xi).
+As we are working in the observational studies setting without randomization, we rely on the
+standard ignorability assumption for causal identification. Specifically, we assume that given the
+observed covariates Zi
+, the assignment of the treatment object is independent of the potential
+outcomes. This is formalized as follows:
+Assumption 6 (Strong Ignorability) Conditional on the observed covariates Zi, the assignment of treatment object X is indepdent of potential outcomes,
+Yi(x) ⊥⊥ Xi
+| Zi = z,
+where 0 < P(Xi = x | Zi = z) < 1 for all i = 1, . . . , N, x ∈ X , and z ∈ Z.
+We are interested in estimating the causal effect of a particular feature that can be part of a
+treatment object. We assume that the treatment feature T is determined solely by the treatment
+object X.
+22
+Assumption 7 (Treatment Feature) There exists a deterministic function gT : X → T that
+maps a treatment object Xi to a treatment feature of interest Ti ∈ T , i.e.,
+Ti = gT (Xi).
+The assumption implies that the treatment variable is a function of the treatment object and does
+not vary across respondents.
+Next, we define confounding features, which represent all features of X other than the treatment
+feature T that influence the outcome Y . These confounding features, denoted by Ui
+, are based
+on a vector-valued deterministic function of X and are denoted by U ∈ U where U denotes their
+support. As in the previous section, however, this confounding feature is not observed.
+Assumption 8 (Confounding Features) There exists an unknown vector-valued deterministic
+function gU : X → U that maps an unstructured object Xi ∈ X to the confounding features Ui ∈ U,
+i.e.,
+Ui = gU (Xi),
+where dim(Ui) ≪ dim(Xi).
+Finally, we describe our key identification assumption that we can intervene the treatment
+feature without changing the confounding features. Specifically, we assume that the treatment
+feature cannot be represented as a deterministic function of the confounding features. In addition,
+confounding features should not be any function of treatment feature either because we only wish
+to adjust for pretreatment variables (Daoud et al., 2022). We formalize this assumption as follows.
+Assumption 9 (Separability of Treatment and Confounding Features) The potential
+outcome is a function of the treatment feature of interest t and another separate function of the
+confounding features u. Specifically, for any given x ∈ X and all i, we have:
+Yi(x) = Yi(t,u) = Yi(gT (x), gU (x)),
+where t = gT (x) ∈ T and u = gU (x) ∈ U. In addition, gT and gU are separable. That is, there
+exists no deterministic function g˜T : U → T , which satisfies gT (x) = ˜gT (gU (x)) for all x ∈ X .
+Similarly, there exist no deterministic functions g
+′
+: X → X ′ and g˜U : T × X ′ → U, which satisfy
+gU (x) = g˜U (gT (x), g
+′
+(x)) for all x ∈ X and g˜U (t, g
+′
+(x
+′
+)) ̸= g˜U (t
+′
+, g
+′
+(x
+′
+)) for t ̸= t
+′ with t, t′ ∈ T
+and some x
+′ ∈ X .
+Under this setup, we are interested in estimating the average potential outcome of the treatment
+feature while controlling for the confounding features, which is defined as follows:
+ξt
+:= E[Yi(t, Ui)]. (S4)
+Figure S3 presents a DAG that summarizes the data generating process and required assumptions for identification (Assumptions 3, and 5–9). As in the previous DAG, an arrow with double
+lines represents a deterministic causal relationship, while an arrow with a single line indicates a
+possibly stochastic causal relationship.
+Given this setup, we establish the nonparametric identification of the dose-response curve defined in Equation (S4).
+23
+P R hγ(R) X
+U = gU (X)
+T = gT (X)
+Z
+Y
+Deep generative model
+Figure S3: Directed Acyclic Graph of the Assumed Data Generating Process when the Treatment is
+an Unstructured Object. A treatment object X (e.g., image) is generated using a deep generative
+model (rectangle) with a prompt P , producing an internal representation R that generates X
+through a deterministic function hγ(R). The treatment object affects the outcome Y through its
+treatment feature of interest T and other confounding features U. Treatment object is assumed
+to be conditionally independent of potential outcomes given the observed structured confounding
+variables Z. An arrow with red double lines represents a deterministic causal relation while an
+arrow with a single line indicates a possibly stochastic relationship.
+Proposition 3 (Nonparametric Identification of the Marginal Distribution of Potential Outcome) Under Assumptions 3, 5–9, there exists a deconfounder function f : R →
+Q ⊂ R
+dQ with dQ = dim(Q) ≤ dR = dim(R) that satisfies the following conditional independence
+relation:
+Yi⊥⊥Ri
+| Ti = t, f(Ri) = q, Zi (S5)
+where 0 < P(Ti = t | f(Ri) = q, Zi = c) < 1 for all t ∈ T and q ∈ Q, and z ∈ Z. In addition, the
+treatment feature and a deconfounder are separable. By adjusting for such a deconfounder, we can
+uniquely and nonparametrically identify the marginal distribution of the potential outcome under
+the treatment condition Ti = t for t ∈ T as:
+P(Yi(t, Ui) = y) = Z
+C
+Z
+R
+P(Yi = y | Ti = t, f(Ri), Zi)dF(Ri)dF(Zi)
+for all y ∈ Y.
+We omit the proof as it is almost identical to the proof of Proposition 1 of Imai and Nakamura
+(2024).
+S2.1.2 Estimation and Inference
+Given the identification formula, we next derive the procedure for the estimation and statistical
+inference. Since our application requires the discrete treatment, we extend the estimation procedure
+ofImai and Nakamura (2024) to the case of discrete treatment and observed structured confounding
+variables in this section.
+We use the same nuisance functions as in the previous section (i.e., the deconfounder f(Ri),
+the conditional potential outcome µTi
+(f(Ri), Zi), and the propensity score πt(f(Ri), Zi)). Our
+procedure for estimating ξ(t) = E[Yi(t, Ui)] at Ti = t is as follows. Denote the observed data by
+D := {Di}
+N
+i=1 where Di
+:= {Yi
+, Ti
+, Ri
+, Zi}. We use the following K-fold cross-fitting procedure,
+assuming that N is divisible by K.
+24
+1. Randomly partition the data into K folds of equal size where the size of each fold is n = N/K.
+The observation index is denoted by I(i) ∈ {1, . . . , K} where I(i) = k implies that the ith
+observation belongs to the kth fold.
+2. For each fold k ∈ {1, · · · , K}, use observations with I(i) ̸= k as training data:
+(a) split the training data into two folds, I
+(−k)
+1
+and I
+(−k)
+2
+(b) estimate both the deconfounder and the conditional outcome function by solving the
+optimization problem given in Equation (S2) using the first fold. They are denoted by
+fˆ(−k)
+({Ri
+, Zi}
+i∈I
+(−k)
+1
+) := f({Ri
+, Zi}
+i∈I
+(−k)
+1
+;λˆ(−k)
+) and ˆµ
+(−k)
+t
+({Ri
+, Zi}
+i∈I
+(−k)
+1
+) :=
+µt(f({Ri}
+i∈I
+(−k)
+1
+, Zi
+;λˆ(−k)
+); θˆ(−k)
+), respectively, and
+(c) obtain an estimated propensity score given the estimated deconfounder on the second
+fold, which is denoted by ˆπ
+(−k)
+(fˆ(−k)
+({Ri}
+i∈I
+(−k)
+2
+), Zi) := ˆπ
+(−k)
+(f({Ri}
+i∈I
+(−k)
+2
+;λˆ(−k)
+), Zi).
+3. For each treatment value t ∈ T , construct the double debiased ML estimator
+ˆξ(t) = 1
+nK
+X
+K
+k=1
+X
+I(i)=k
+
+µˆ
+(−k)
+t
+(f(Ri), Zi) + 1{Ti = t}
+πˆ
+(−k)
+t
+(f(Ri), Zi)
+
+Yi − µˆ
+(−k)
+t
+(f(Ri), Zi)
+
+Under the standard regularity conditions and the Lipschitz continuity of the propensity score function, the procedure above yields the asymptotically normal estimator with the double robustness
+property.
+S2.2 Implementation Details for the Empirical Application
+We reanalyze the dataset originally compiled by Lindholm et al. (2024). In that study, the authors
+collected facial photographs of Danish political candidates, along with their vote totals and background characteristics — including date of birth, gender, and education — for the 2021 local and
+2022 general elections. The initial dataset contained 9,020 candidates. However, the authors excluded individuals whose photos were missing, of low quality, or overlaid with text, as well as those
+who ran uncontested. In addition, while most of the photos are square, we found that 237 photos
+have a different aspect ratio. To ensure consistency for the downstream analysis, we excluded these
+photos from the dataset. This resulted in a final analytic sample of 6,868 candidates. To quantify
+facial traits, the authors fine-tuned a pre-trained convolutional neural network using the “One
+Million Impressions” dataset (Peterson et al., 2022), generating estimates for three dimensions of
+perceived facial characteristics: attractiveness, dominance, and trustworthiness.
+We implemented our proposed methodology as follows. First, we padded each image to a square
+shape with dimensions of 304 × 304 pixels to ensure uniform input size. We then regenerated the
+candidate images using Stable Diffusion version 1.5 (Rombach et al., 2022). We extracted the
+internal representation from the final layer of the diffusion model, prior to the decoder of the
+variational autoencoder. Consistent with Assumption 3, we made sure that the decoder is a
+deterministic function of this internal representation.
+Unlike in the text-based application, we did not apply a pooling operation to reduce dimensionality. Instead, we flattened the full internal representation (a tensor of shape 16×16×64) into
+a single vector of dimension 16,384, which is substantially smaller than the original image size of
+512 × 512 × 3 = 786, 432.
+We estimated both the deconfounder and the outcome model, using this internal representation
+R, the treatment feature of interest (one of the three facial traits), the outcome variable (number of
+25
+Model Facial Traits Learning Rate Dropout Outcome Model Deconfounder
+Stable Attractiveness 1.027 × 10−7 0.147 [50, 1] [256, 128]
+Diffusion Dominance 1.364 × 10−7 0.079 [50, 1] [512, 256]
+ver1.5 Trustworthiness 1.001 × 10−7 0.124 [100, 1] [256, 128]
+Stable Attractiveness 1.006 × 10−7 0.234 [50, 1] [256, 128]
+Diffusion Dominance 1.018 × 10−7 0.069 [50, 1] [512, 256]
+ver 2.1 Trustworthiness 1.266 × 10−7 0.245 [50, 1] [512, 256]
+Table S3: Optimal hyperparameters selected for each independent variable using Optuna for each
+model. The table lists the learning rate, dropout rate, outcome model architecture, and deconfounder architecture applied to the replication of Lindholm et al. (2024).
+votes received), and the structured confounders (age, gender, and education). As some structured
+confounders were missing, we created the missing indicator variables and interact them with the
+structured confounders to use the entire data. To evaluate the impact of observed covariates, we
+fitted the model both with and without these structured confounders.
+The neural network architecture used in this application mirrored that of our previous application, and hyperparameter tuning was again performed using Optuna. The tuning procedure
+followed the same protocol as before, with separate fine-tuning conducted for each of the three
+facial traits. The selected optimal hyperparameters are reported in Table S3.
+To estimate the average potential outcome for each facial trait, we applied the methodology
+described earlier, using 2-fold cross-fitting in combination with the selected hyperparameters to
+estimate both the deconfounder and outcome models. All optimization settings — including the
+choice of optimizer, batch size, number of training epochs, gradient clipping, and early stopping —
+were held consistent with the prior application for comparability. We also combined the estimates
+from the two different generative models (Stable Diffusion versions 1.5 and 2.1) by the optimal
+linear combination method proposed in the previous section. We then compared our results to the
+linear regression results with a discretized treatment and the same covariates, which mirrored the
+original paper’s analysis in Lindholm et al. (2024). All the results are presented in Figure S4.
+S3 Structural Model of Texts
+In this section, we provide the formal theoretical justification for the methodology introduced in
+Section 2.3. This application is intended to demonstrate how our GPI framework can be integrated into an existing structural model. Specifically, we tailor the proposed methodology to the
+experimental setting of Blumenau and Lauderdale (2022), which focuses on estimating the latent
+persuasiveness of political rhetoric. Unlike the previous two applications, this analysis employs a
+model-based inferential approach. We begin by outlining the experimental design, then introduce
+our proposed semiparametric model, and finally detail the implementation of the empirical analysis.
+S3.1 Experimental Design
+To estimate the latent persuasiveness of political rhetoric, Blumenau and Lauderdale (2022) constructed a set of hypothetical political arguments and randomly assigned pairs of these arguments
+to survey respondents. The authors designed a total of 336 distinct arguments, which varied systematically across 12 policy issues in contemporary British politics. These arguments served as the
+treatment conditions in the experiment.
+• Building a third runway at Heathrow
+26
+attractiveness dominance trustworthiness
+GPI (Combined) GPI (SD1.5) GPI (SD2.1) OLS
+2.5 5.0 7.5 10.0 2.5 5.0 7.5 10.0 2.5 5.0 7.5 10.0
+−0.25
+0.00
+0.25
+0.50
+−0.25
+0.00
+0.25
+0.50
+−0.25
+0.00
+0.25
+0.50
+−0.25
+0.00
+0.25
+0.50
+Trait Value (Quantile)
+Standardized votes received (z−score)
+Covariate Adjustment No Yes
+Figure S4: Estimated predictive effects of three facial traits (Attractiveness, Dominance, and
+Trustworthiness) using GPI with Stable Diffusion (SD) version 1.5 (top) and version 2.1 (second),
+their optimal linear combination (third), and OLS (bottom). In each panel, solid and dash lines
+represent estimates with and without covariate adjustment, respectively. Blue and red shaded
+areas indicate the corresponding 95% confidence intervals.
+• Closing large retail stores on Boxing Day
+• Extending the Right to Buy
+• Extension of surveillance powers in the UK
+• Fracking in the UK
+• Nationalization of the railways in the UK
+• Quotas for women on corporate boards
+• Reducing the legal restrictions on cannabis use
+• Reducing university tuition fees
+27
+• Renewing Trident
+• Spending 0.7% of GDP on overseas aid
+• Sugar tax in the UK
+and rhetorical elements (14 rhetorical elements):
+• Ad hominem
+• Appeal to authority
+• Appeal to fairness
+• Appeal to history
+• Appeal to national greatness
+• Appeal to populism
+• Common sense
+• Cost and benefit
+• Country comparison
+• Crisis
+• Metaphor
+• Morality
+• Public opinion
+• Side effects of policy
+and the side of the argument (2 sides, i.e., for or against).
+Once a set of texts were generated, they are randomly assigned to respondents. Specifically,
+in the experiment, respondents were presented with a pair of randomly selected for and against
+arguments on the same policy issue, which differ in rhetorical elements. They were then asked
+to indicate which argument they found more persuasive, or whether they found them equally
+persuasive. A total of 3,317 respondents participated in the study, and each of them was shown
+four randomly selected issues, yielding 13,268 observations.
+Once the set of arguments was generated, they were randomly assigned to respondents. In the
+experiment, each respondent was presented with a pair of arguments on the same topic—one in
+favor and one against a given policy issue—that differed in their rhetorical elements. Respondents
+were asked to indicate which argument they found more persuasive, or whether they found both
+equally persuasive. A total of 3,317 respondents participated in the study, each evaluating four
+randomly selected issue pairs, resulting in 13,268 pairwise observations.
+Our goal is to estimate the latent persuasiveness of each rhetorical element. The key methodological challenge is that, although argument pairs are randomly assigned to respondents, the
+rhetorical elements themselves may still be correlated with other features of the texts. Table S4
+provides two example arguments on the same policy issue (“Building a third runway at Heathrow”)
+28
+Appeal to authority / For
+The Airports Commission, an independent body established to study the issue, have argued that expanding Heathrow is ”the most effective option to address the UK’s aviation
+capacity challenge”
+Appeal to history / Against
+History show us that most large infrastructure projects do not lead to significant economic
+growth, which suggests that the expansion of Heathrow will fail to pay for itself.
+Table S4: Two examples of political rhetorics about the policy issue regarding “Building a third
+runway at Heathrow.”
+used in the experiment. While both address the same topic, they differ in multiple dimensions beyond rhetorical style or stance, highlighting the potential for confounding.
+To address this issue, Blumenau and Lauderdale (2022) identified seven additional textual
+features—argument length, readability, positive and negative tone, overall emotional language, factbased language, and whether the argument was sourced from parliamentary speeches in Hansard
+or authored by the researchers—and included them as control variables in their analysis. However,
+there is no theoretical guarantee that this list fully captures all relevant sources of variation, leaving
+open the possibility of residual confounding.
+S3.2 Model of Latent Persuasiveness
+We model the persuasiveness of the political rhetorics in the same way as Blumenau and Lauderdale
+(2022) but use the internal representation of the deep generative model to adjust for the argumentlevel confounders. Suppose that we have J arguments indexed by j = 1, · · · , J and N respondents
+indexed by i = 1, · · · , N. Let Xj denote the text of argument j. We regenerate this text using
+a deep generative model as defined in Definition 1 and obtain its internal representation Rj . As
+before, we assume that the last layer of the deep generative model is a deterministic function of
+the internal representation Rj (Assumption 3).
+Each argument text Xj contains three features of interest: a rhetorical element Tj ∈ {1, · · · , 14},
+a side of the argument Sj ∈ {1, 2} (for or against), and a policy issue Pj ∈ {1, · · · , 12}. All features
+of interest are solely based on the argument text Xj , and thus can be written as deterministic
+functions of the internal representation Rj .
+Each respondent i is presented with a pair of arguments (Xj , Xj
+′) on the same topic Pj = Pj
+′
+but with the opposite sides Sj ̸= Sj
+′ and then asked to answer the question about persuasiveness.
+Let Yjj′(i) denote the outcome variable, representing respondent i’s answer to this question. Then,
+we can define the outcome as follows:
+Yjj′(i) =
+
+
+
+0 if respondent i answers that argument j is more persuasive
+1 if respondent i answers that both arguments are equally persuasive
+2 if respondent i answers that argument j
+′
+is more persuasive
+We use J (i) to represent a set of argument pairs assigned to respondent i.
+In the original paper, Blumenau and Lauderdale (2022) proposed a model to estimate the latent
+persuasiveness of the rhetorical elements by adopting the Bradley-Terry model (Bradley and Terry,
+1952). The model assumes the following data generating process,
+log 
+P(Yjj′(i) ≤ k)
+P(Yjj′(i) > k)
+
+= δk + (αPjSj + βTj + γj ) − (αPj
+′Sj
+′ + βTj
+′ + γj
+′), (S6)
+29
+where βt ∼ N (0, ω) and γj ∼ N (0, σTj
+), δk is the intercept for response category k, αps is the
+fixed effect of the policy issue Pj = p and the side of argument Sj = s, βt
+is the average effect of
+the rhetorical element Tj = t, and γj is the random effect of argument j with variance σTj
+, which
+varies across rhetorical elements.
+While this model has the effect of the policy issue and side of the argument, it does not adjust
+for the other confounding features of text. The model also assumes that the rhetorical element Tj is
+linearly separable from policy issues and the side of the argument, and that the prior distributions
+for βt and γj are independent and normal. Neither assumption is guaranteed by the experimental
+design. Our goal is to apply GPI and relax these restrictive assumptions.
+We estimate the persuasiveness of the rhetorical element Tj in argument j while further adjusting for the confounding features of the text Xj . As before, let Uj denote the confounding
+features of argument j that are not captured by the rhetorical element Tj , policy topic Pj , and
+side of argument Sj . We assume that these confounding features Uj are a deterministic function
+of the argument Xj , i.e., Uj = gU (Xj ), where gU is an unknown vector-valued function (Assumption 8). These confounding features are assumed to be separable from the rhetorical element Tj
+(Assumption 9).
+We model the outcome by relaxing the parameteric assumptions of the original model. Specifically, we assume the following semiparametric structural model:
+log 
+P(Yjj′(i) ≤ y)
+P(Yjj′(i) > y)
+
+= δy + µ(Tj , Uj ) − µ(Tj
+′, Uj
+′) (S7)
+where we assume PJ
+j=1 µ(Tj , Uj ) = 0 for identification, and µ(Tj , Uj ) represents the persuasiveness
+of argument j presented to the respondent i as a function of its rhetorical element Tj and other
+confounding features Uj . This model is semiparametric because we do not restrict the functional
+form of µ(Tj , Uj ) while assuming that the persuasiveness of argument j does not interact with that
+of argument j
+′
+.
+Under this model, we are interested in estimating the persuasiveness of each rhetorical element
+Tj = t ∈ {1, · · · , 14}, which is defined as follows:
+β(t) = E[µ(Tj = t, Uj )]. (S8)
+Although the confounding features Uj are unobserved, Proposition 3 shows that we can estimate
+the quantity of interest by adjusting for the deconfounder f(Rj ):
+β(t) = Z
+R
+µ(t, f(Rj ))dF(Rj ) (S9)
+where f(Rj ) is a function satisfying the conditional independence relation Yjj′(i)⊥⊥Rj | Tj , f(Rj ).
+As shown in Proposition 3, the deconfounder function need not be unique.
+Based on this identification result, we propose fitting the model with a neural network architecture. Specifically, we use the following semiparametric structural model for estimation:
+log 
+P(Yjj′(i) ≤ k)
+P(Yjj′(i) > k)
+
+= δk + µ(Tj , f(Rj ;λ); θ) − µ(Tj
+′, f(Rj
+′;λ); θ). (S10)
+where λ and θ are the parameters of the deconfounder function f(Rj ;λ) and the argument persuasiveness function µ(Tj , f(Rj ;λ); θ), respectively, and PJ
+j=1 µ(Tj , f(Rj ;λ); θ) = 0. This structural
+model is feasible because we observe the internal representation Rj , which enables us to estimate
+both the deconfounder f(Rj ) and the function µ(Tj , f(Rj )).
+30
+We model µ(Tj , f(Rj ;λ); θ) as a neural network function of the deconfounder f(Rj ) and
+the treatment feature Tj , using the architecture introduced in the previous section (Figure S2).
+This neural network architecture encodes the conditional independence relationship Yjj′(i)⊥⊥Rj |
+Tj , f(Rj ). We minimize the following loss function to estimate the parameters:
+{λˆ, θˆ,
+ˆδ} = argmin
+λ,θ,δ
+−
+X
+N
+i=1
+X
+(j,j′)∈J (i)
+X
+1
+k=0
+
+1{Yjj′(i) ≤ k} log σ(δk + µjj′) + 1{Yjj′(i) > k} log{1 − σ(δk + µjj′)}
+
+s.t. X
+J
+j=1
+µ(Tj , f(Rj ;λ); θ) = 0,
+(S11)
+where µjj′ = µ(Tj , f(Rj ;λ); θ) − µ(Tj
+′, f(Rj
+′;λ); θ) and σ(x) = 1/(1 + exp(−x)) is the logistic
+function. Once we estimate the parameters λ and θ, we can compute the estimated persuasiveness
+of each rhetorical element Tj = t ∈ {1, · · · , 14} using Equation (S9). We quantify the uncertainty
+of the estimated persuasiveness using the Monte Carlo dropout method (Gal and Ghahramani,
+2016).
+The entire estimation procedure can be summarized as follows.
+1. Use the entire data to solve the optimization problem given in Equation (S11) and simultaneously obtain fˆ(Rj ) := f(Rj ;λˆ) and ˆµ(Tj , Rj ) := µ(Tj , f(Rj ;λˆ); θˆ)
+2. Obtain the estimated latent persuasiveness of each rhetorical element t ∈ {1, · · · , 14} by
+βˆ(t) = 1
+J
+X
+J
+j=1
+µˆ(t, fˆ(Rj )), (S12)
+and the uncertainty quantification with Monte Carlo dropout.
+S3.3 Implementation Details of the Empirical Application
+To implement our proposed methodology, we first regenerated all 336 arguments used in the experiment of Blumenau and Lauderdale (2022) using the three different LLMs: (1) LLaMA3 with 8
+billion parameters, (2) LLaMA3.3 with 8 billion parameters, and (3) Gemma 3 with 1 billion parameters. Similar to the first application, we extracted the internal representation of each argument.
+The dimensions of internal representation Ri are different across models: 4096 for LLaMA3 with
+8 billion parameters, 8192 for LLaMA3.3 with 70 billion parameters, and 1152 for Gemma 3 with
+1 billion parameters. Even though the dimensions are different, since all internal representations
+deterministically regenerate each arguments, they should contain all the information contained in
+the texts and should yield the similar estimates. Using the same neural network architecture as in
+the previous two applications, we fine-tuned both the outcome model and the deconfounder within
+the semiparametric structural model (see Equation (S10)). We implemented the constraint in the
+optimization problem (Equation (S11)) by demeaning the estimated outcome model, ensuring its
+average is zero.
+For fine-tuning, we employed the same hyperparameter search space and procedure as in the
+previous two applications, optimizing the hyperparameters using Optuna. For both fine-tuning and
+the entire structural model fitting, we used the Adam optimizer with batch size of 256 and weight
+decay of 10−8
+, and we applied gradient clipping with a maximum norm of 1.0. The optimal hyperparameters selected by Optuna are shown in Table S5. We then fitted the entire structural model
+using the selected hyperparameters and a 2-fold cross-fitting procedure, as described above. Once
+31
+Model dim(R) Learning Rate Dropout Outcome Model Deconfounder
+LLaMA3 (8B) 4096 9.626 × 10−5 0.294 [50, 1] [256, 128]
+LLaMA3.3 (70B) 8192 9.967 × 10−5 0.152 [50, 1] [512, 256]
+Gemma3 (1B) 1152 9.916 × 10−5 0.280 [50, 1] [1024, 512]
+Table S5: Optimal hyperparameters selected for the outcome model and deconfounder in the
+replication of Blumenau and Lauderdale (2022). The table lists the learning rate, dropout rate,
+outcome model architecture, and deconfounder architecture.
+we had fitted the outcome model, we estimated the latent persuasiveness based on Equation (S12)
+and its uncertainty using Monte Carlo dropout with 3000 samples.
+We find that the estimated latent persuasiveness of rhetorical elements is consistent across the
+three LLMs, as shown in Figure S5. The Pearson’s correlation for the estimated latent persuasiveness of rhetorical elements across models are 0.89 for LLaMA 3 (8B) and LLaMA 3.3 (70B), 0.97
+for LLaMA 3 (8B) and Gemma 3 (1B), and 0.86 for LLaMA 3.3 (70B) and Gemma 3 (1B). These
+results suggest that even though the internal representations are different, the three LLMs yield
+similar estimates under the deterministic decoding assumption (Assumption 3).
+−0.3
+−0.2
+−0.1
+0.0
+0.1
+−0.3 −0.2 −0.1 0.0 0.1
+Estimates (Gemma−3−1B)
+Estimates (LLaMA Model 8B or 70B)
+LLaMA Model LLaMA−3−8B LLaMA−3.3−70B
+Figure S5: The estimated latent persuasiveness of rhetorical elements across three LLMs (LLaMA3
+with 8 billion parameters, LLaMA 3.3 with 70 billion parameters, and Gemma 3 with 1 billion
+parameters). The dashed lines represent the fitted regression lines.
+32
+S4 Proofs
+S4.1 Proof of Proposition 1
+Proof Under the definition of the deep generative model (see Definition 1) and Assumption 3, we
+can write Ui = f
+∗
+(Ri) with some deterministic function f
+∗
+. Then,
+P(Yi(t) = y) = Z
+Z
+Z
+U
+P(Yi(t) = y | Zi
+, Ui)dF(Ui)dF(Zi)
+=
+Z
+Z
+Z
+U
+P(Yi(t) = y | Ti = t, Zi
+, Ui)dF(Ui)dF(Zi)
+=
+Z
+Z
+Z
+U
+P(Yi = y | Ti = t, Zi
+, Ui)dF(Ui)dF(Zi)
+=
+Z
+Z
+Z
+U
+P(Yi = y | Ti = t, Zi
+, f
+∗
+(Ri))dF(f
+∗
+(Ri))dF(Zi)
+=
+Z
+Z
+Z
+Rq
+P(Yi = y | Ti = t, Zi
+, f
+∗
+(Ri))dF(Ri)dF(Zi)
+where the second equality follows from Assumption 2, the third equality follows from Assumption 1.
+Finally, suppose that there exists another function f(Ri) that satisfies the conditional independence
+relation Yi⊥⊥Ri
+| Ti
+, Zi
+, f(Ri). Then,
+Z
+Z
+Z
+Rq
+P(Yi = y | Ti = t, Zi
+, f(Ri))dF(Ri)dF(Zi)
+=
+Z
+Z
+Z
+Rq
+P(Yi = y | Ti = t, Zi
+, f(Ri), Ri)dF(Ri)dF(Zi)
+=
+Z
+Z
+Z
+Rq
+P(Yi = y | Ti = t, Zi
+, f
+∗
+(Ri), Ri)dF(Ri)dF(Zi)
+=
+Z
+Z
+Z
+Rq
+P(Yi = y | Ti = t, Zi
+, f
+∗
+(Ri))dF(Ri)dF(Zi)
+Thus, any function of Ri that satisfies the conditional independence relation Yi⊥⊥Ri
+| Ti
+, Zi
+, f(Ri)
+leads to the same identification formula. ✷
+S4.2 Proof of Proposition 2
+Proof By Theorem 1, we know that each estimator ˆτj (j = 1, 2) has the influence function
+representation:
+√
+N(ˆτj − τ ) = 1
+√
+N
+X
+N
+i=1
+ψj (Dij ) + oP (1)
+where ψj (Dij ) is the influence function for the estimator ˆτj at the observation Dij . Therefore, for
+any weight ω, the estimator ˆτ = ωτˆ1 + (1 − ω)ˆτ2 has the influence function representation:
+√
+N(ˆτ − τ ) = 1
+√
+N
+X
+N
+i=1
+{ωψ1(Di1) + (1 − ω)ψ2(Di2)} + oP (1)
+Therefore, by central limit theorem, for any ω, we have
+√
+N(ˆτ − τ )
+d−→ N (0, V (ω))
+33
+where V (ω) = E[(ωψ1(Di1) + (1 − ω)ψ2(Di2))2
+].
+Then, since V (ω) is a quadratic function of ω, we can minimize the asymptotic variance V (ω)
+with respect to ω as follows,
+V (ω) = ω
+2E[ψ1(Di1)
+2
+] + (1 − ω)
+2E[ψ2(Di2)
+2
+] + 2ω(1 − ω)E[ψ1(Di1)ψ2(Di2)]
+= {E[ψ1(Di1)
+2
+] + E[ψ2(Di2)
+2
+] − 2E[ψ1(Di1)ψ2(Di2)]}ω
+2
++ 2{E[ψ1(Di1)ψ2(Di2)] − E[ψ2(Di2)
+2
+]}ω + E[ψ2(Di2)
+2
+].
+As it is a quadratic function of ω, it is minimized at
+ω
+∗ =
+E[ψ2(Di2)
+2
+] − E[ψ1(Di1)ψ2(Di2)]
+E[ψ1(Di1)
+2] + E[ψ2(Di2)
+2] − 2E[ψ1(Di1)ψ2(Di2)]
+✷
+34
