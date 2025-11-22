@@ -11,28 +11,44 @@ const AttentionHead = ({ data, bufferRef }: { data: number[][], bufferRef: React
 	const texture = useMemo(() => {
 		const array = new Float32Array(bufferSize * bufferSize * 4);
 		
-		// If we have previous buffer data, shift it up and left by one cell
-		if (bufferRef.current && bufferRef.current.length === array.length) {
-			// Shift existing data up and left
+		// Determine if we need to shift (scrolling) or are still filling initial buffer
+		const prevBuffer = bufferRef.current;
+		const shouldShift = prevBuffer && prevBuffer.length === array.length;
+		
+		if (shouldShift) {
+			// Shift existing data up and left by one cell
 			for (let i = 0; i < bufferSize - 1; i++) {
 				for (let j = 0; j < bufferSize - 1; j++) {
 					const srcIdx = ((i + 1) * bufferSize + (j + 1)) * 4;
 					const dstIdx = (i * bufferSize + j) * 4;
-					array[dstIdx] = bufferRef.current[srcIdx];
-					array[dstIdx + 1] = bufferRef.current[srcIdx + 1];
-					array[dstIdx + 2] = bufferRef.current[srcIdx + 2];
-					array[dstIdx + 3] = bufferRef.current[srcIdx + 3];
+					array[dstIdx] = prevBuffer[srcIdx];
+					array[dstIdx + 1] = prevBuffer[srcIdx + 1];
+					array[dstIdx + 2] = prevBuffer[srcIdx + 2];
+					array[dstIdx + 3] = prevBuffer[srcIdx + 3];
 				}
 			}
+		} else if (prevBuffer) {
+			// Copy existing buffer without shifting during initial fill
+			array.set(prevBuffer);
 		}
 		
 		// Normalize new data
 		let maxVal = 0;
 		for(let i=0; i<size; i++) for(let j=0; j<size; j++) maxVal = Math.max(maxVal, data[i][j]);
 		
-		// Write new data to bottom-right corner
-		const offsetY = bufferSize - size;
-		const offsetX = bufferSize - size;
+		// Calculate write position based on whether we're scrolling or filling
+		let offsetY: number, offsetX: number;
+		
+		if (shouldShift) {
+			// Write new data to bottom-right corner (scrolling mode)
+			offsetY = bufferSize - size;
+			offsetX = bufferSize - size;
+		} else {
+			// Initial fill: start from top-left (0,0) and haven't started scrolling yet
+			offsetY = 0;
+			offsetX = 0;
+		}
+		
 		for (let i = 0; i < size; i++) {
 			for (let j = 0; j < size; j++) {
 				const val = data[i][j] / (maxVal || 1);
@@ -103,7 +119,7 @@ const AttentionHead = ({ data, bufferRef }: { data: number[][], bufferRef: React
 
 const HeadContainer = ({ data, bufferRef }: { data: number[][], bufferRef: React.MutableRefObject<Float32Array | undefined> }) => {
     return (
-        <div className="head-wrapper" style={{ position: 'relative', width: '100%', aspectRatio: '1/1', boxSizing: 'border-box' }}>
+        <div className="head-wrapper" style={{ position: 'relative', width: '100%', aspectRatio: '1/1', boxSizing: 'border-box', border: '1px solid #fff' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
                 <Canvas>
                     <OrthographicCamera makeDefault manual left={-1} right={1} top={1} bottom={-1} position={[0, 0, 10]} />

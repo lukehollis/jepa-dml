@@ -20,6 +20,7 @@ def generate_representations(encoder, data_loader, device):
     return torch.cat(R_list), torch.cat(T_list), torch.cat(Y_list)
 
 
+
 def execute_dml_workflow(dataset, config, device, train_encoder_func=train_jepa):
     """
     Implements the full K-Fold Cross-Fitting DML procedure (ICCV Algorithm 1).

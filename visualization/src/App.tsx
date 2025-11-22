@@ -8,7 +8,7 @@ function App() {
   const wsRef = useRef<WebSocket | null>(null)
 
   const connect = () => {
-    const ws = new WebSocket('ws://localhost:8000/ws/inference')
+    const ws = new WebSocket('ws://localhost:8010/ws/inference')
     
     ws.onopen = () => {
       console.log('Connected')
