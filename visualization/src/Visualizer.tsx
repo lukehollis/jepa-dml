@@ -89,7 +89,7 @@ const AttentionHead = ({ data, bufferRef }: { data: number[][], bufferRef: React
 	}, [texture]);
 
 	useFrame((state) => {
-		const t = state.clock.getElapsedTime() * .5;
+		const t = state.clock.getElapsedTime() * 2.0;
 		material.uniforms.uTime.value = t;
 	});
 

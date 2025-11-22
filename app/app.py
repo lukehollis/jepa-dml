@@ -119,14 +119,14 @@ async def websocket_endpoint(websocket: WebSocket):
             # Stream the new batch
             for update in orchestrator.stream_analysis(train_loader, config):
                 await websocket.send_json(update)
-                await asyncio.sleep(0.1) # Rate limit
+                await asyncio.sleep(0.01) # Rate limit
             
             batch_count += 1
             if batch_count % 10 == 0:
                 print(f"[WS] Streamed {batch_count} batches")
             
             # Small delay between batches to prevent overwhelming the client
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.01)
         
     except Exception as e:
         print(f"[WS] Error: {e}")
